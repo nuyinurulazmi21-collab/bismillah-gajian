@@ -3293,15 +3293,43 @@ function renderAIChat(){
     box.innerHTML='<div style="text-align:center;padding:20px;color:var(--tx3)"><div style="font-size:1.8462rem;margin-bottom:8px">✨</div>Klik <strong>Analisis Sekarang</strong> atau ajukan pertanyaan untuk mulai berdiskusi dengan Asisten AI</div>';
     return;
   }
-  box.innerHTML = arr.map(function(m){
+  box.innerHTML = arr.map(function(m,i){
     var time=new Date(m.time).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
+    var actions='<span onclick="saveAIChatMsgAsNote('+i+')" title="Simpan ke Catatan" style="cursor:pointer;opacity:.55" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.55">💾</span>'
+      +'<span onclick="deleteAIChatMsg('+i+')" title="Hapus pesan ini" style="cursor:pointer;opacity:.55" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.55">🗑</span>';
     if(m.role==='user'){
-      return '<div style="align-self:flex-end;max-width:80%"><div style="background:var(--blue);color:#fff;padding:10px 14px;border-radius:14px 14px 3px 14px;font-size:0.9231rem;line-height:1.5">'+escHtml(m.text)+'</div><div style="text-align:right;font-size:0.7308rem;color:var(--tx3);margin-top:3px">'+time+'</div></div>';
+      return '<div style="align-self:flex-end;max-width:80%"><div style="background:var(--blue);color:#fff;padding:10px 14px;border-radius:14px 14px 3px 14px;font-size:0.9231rem;line-height:1.5">'+escHtml(m.text)+'</div><div style="display:flex;justify-content:flex-end;align-items:center;gap:8px;font-size:0.7308rem;color:var(--tx3);margin-top:3px">'+actions+'<span>'+time+'</span></div></div>';
     }
     var lbl=m.label?'<div style="font-size:0.7692rem;font-weight:700;color:#8b5cf6;margin-bottom:4px">'+m.label+'</div>':'';
-    return '<div style="align-self:flex-start;max-width:92%"><div style="background:var(--bg3);border:1px solid var(--bd);padding:12px 16px;border-radius:3px 14px 14px 14px;font-size:0.9231rem;line-height:1.7;color:var(--tx2)">'+lbl+m.text+'</div><div style="font-size:0.7308rem;color:var(--tx3);margin-top:3px">'+time+'</div></div>';
+    return '<div style="align-self:flex-start;max-width:92%"><div style="background:var(--bg3);border:1px solid var(--bd);padding:12px 16px;border-radius:3px 14px 14px 14px;font-size:0.9231rem;line-height:1.7;color:var(--tx2)">'+lbl+m.text+'</div><div style="display:flex;align-items:center;gap:8px;font-size:0.7308rem;color:var(--tx3);margin-top:3px"><span>'+time+'</span>'+actions+'</div></div>';
   }).join('');
   box.scrollTop = box.scrollHeight;
+}
+
+function deleteAIChatMsg(i){
+  if(blockIfViewer())return;
+  if(!S.aiChat||!S.aiChat[i])return;
+  S.aiChat.splice(i,1);
+  saveS();
+  renderAIChat();
+  addNotif('Pesan chat dihapus','info');
+}
+
+function saveAIChatMsgAsNote(i){
+  if(blockIfViewer())return;
+  if(!S.aiChat||!S.aiChat[i])return;
+  const m=S.aiChat[i];
+  const plainText=(m.text||'').replace(/<br\s*\/?>/gi,'\n').replace(/<[^>]+>/g,' ').replace(/[ \t]+/g,' ').replace(/\n{3,}/g,'\n\n').trim();
+  // Kalau ini jawaban asisten, ikutkan pertanyaan sebelumnya (kalau ada) sebagai konteks judul
+  let title='Chat Asisten AI';
+  if(m.role==='user'){
+    title='Tanya: '+plainText.slice(0,60);
+  } else if(i>0 && S.aiChat[i-1] && S.aiChat[i-1].role==='user'){
+    title='Jawab: '+S.aiChat[i-1].text.slice(0,60);
+  }
+  S.notes.unshift({id:'n'+Date.now(),title:title,body:plainText,tag:'AI Chat',color:'nc-p',pinned:false,ts:new Date().toISOString()});
+  saveS();
+  addNotif('✅ Disimpan ke Catatan','ok');
 }
 
 function escHtml(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
@@ -3401,7 +3429,7 @@ async function callGeminiAPI(prompt){
       const resp2 = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key='+S.geminiKey,{
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.4,maxOutputTokens:3500}})
+        body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.4,maxOutputTokens:6000}})
       });
       if(resp2.ok){
         const j2=await resp2.json();
