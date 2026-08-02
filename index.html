@@ -1798,7 +1798,7 @@ function renderDash(){
 
 // KPI DRAWER
 function openKpiDrw(key){
-  const d=getPeriodSites();let ttl='',rows=[];
+  const d=getFilt();let ttl='',rows=[];
   if(key==='total'){ttl='Semua Transaksi';rows=d;}
   else if(key==='hc'){ttl='HC per Rekap Jadwal';
     const gm={};REKAP_GROUPS.forEach(rg=>gm[rg.l]={hc:0});d.forEach(r=>{const gr=getRG(r.tgl);if(!gm[gr])gm[gr]={hc:0};gm[gr].hc+=(r.hc||0);});
