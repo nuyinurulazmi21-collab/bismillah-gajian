@@ -250,6 +250,42 @@ body.viewer #btn-push-gaji{display:none !important}
 body.viewer .btn.grn[onclick*="add-site"]{display:none !important}
 body.viewer .btn-del-row{display:none !important}
 body.viewer .nav-it[onclick*="settings"]{display:none !important}
+/* Tambahan: tutup seluruh titik mutasi lain agar viewer benar-benar read-only */
+body.viewer [onclick*="pushSaldoToSheet"]{display:none !important}
+body.viewer [onclick*="savePref"]{display:none !important}
+body.viewer [onclick*="changePw"]{display:none !important}
+body.viewer [onclick*="addAccount"]{display:none !important}
+body.viewer [onclick*="backupData"]{display:none !important}
+body.viewer [onclick*="clearAll"]{display:none !important}
+body.viewer [onclick*="saveSaldoEdit"]{display:none !important}
+body.viewer [onclick*="savePeriod"]{display:none !important}
+body.viewer [onclick*="saveNote"]{display:none !important}
+body.viewer [onclick*="openSaldoEdit"]{display:none !important}
+body.viewer [onclick*="editSaldoAR"]{display:none !important}
+body.viewer [onclick*="addRekening"]{display:none !important}
+body.viewer [onclick*="togglePin"]{display:none !important}
+body.viewer [onclick*="delNote"]{display:none !important}
+body.viewer [onclick*="delAcct"]{display:none !important}
+body.viewer [onclick*="doReset"]{display:none !important}
+body.viewer [onclick*="promptSaldoReady"]{display:none !important}
+body.viewer [onclick*="promptArPot"]{display:none !important}
+body.viewer [onclick*="saveGeminiKeyAI"]{display:none !important}
+body.viewer [onclick*="clearGeminiKey"]{display:none !important}
+body.viewer [onclick*="saveGeminiKey"]{display:none !important}
+body.viewer [onclick*="saveSyncURL"]{display:none !important}
+body.viewer [onclick*="openUploadOverlay"]{display:none !important}
+body.viewer .fab-add, body.viewer .btn-add-row{display:none !important}
+/* Viewer hanya boleh mengakses halaman Gaji (lihat & cari) — semua nav lain disembunyikan */
+body.viewer #nv-dashboard,body.viewer #nv-posisi,body.viewer #nv-rekap,body.viewer #nv-tren,
+body.viewer #nv-grafik,body.viewer #nv-analisis,body.viewer #nv-notes,body.viewer #nv-tampilan,
+body.viewer #nv-settings{display:none !important}
+/* Viewer tidak boleh export/unduh dalam bentuk apapun */
+body.viewer [onclick*="doExport"],body.viewer [onclick*="exportGajiXLSX"],body.viewer [onclick*="exportGajiCSV"],
+body.viewer [onclick*="exportSaldoXLSX"],body.viewer [onclick*="exportSaldoCSV"],body.viewer [onclick*="exportRekapXLSX"],
+body.viewer [onclick*="exportRekapCSV"],body.viewer [onclick*="exportTrenXLSX"],body.viewer [onclick*="exportTrenCSV"],
+body.viewer [onclick*="exportAllXLSX"],body.viewer [onclick*="exportPPTX"],body.viewer [onclick*="downloadCSV"],
+body.viewer [onclick*="exportTrenPNG"],body.viewer [onclick*="printScope"],body.viewer [onclick*="openModal('export-modal')"],
+body.viewer [onclick*="backupData"]{display:none !important}
 /* TOMBOL HAPUS BARIS */
 .btn-del-row{width:28px;height:28px;border-radius:7px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s;color:var(--tx4)}
 .btn-del-row:hover{background:var(--red-l);color:var(--red)}
@@ -1351,6 +1387,7 @@ function loadS(){
       if(p.arPotensial)  S.arPotensial  = p.arPotensial;
       if(p.lastSync)     S.lastSync     = p.lastSync;
       if(p.notes && p.notes.length) S.notes = p.notes;
+      if(p.aiChat && p.aiChat.length) S.aiChat = p.aiChat;
       // Accounts: merge tapi pastikan admin default selalu ada
       if(p.accounts && p.accounts.length){
         S.accounts = p.accounts;
@@ -1465,6 +1502,23 @@ function doLogout(){
   location.reload();
 }
 
+// ── VIEWER READ-ONLY GUARD ──────────────────────────────
+// Viewer hanya boleh melihat data, tidak boleh melakukan perubahan apapun.
+// Guard ini dipasang di setiap fungsi yang mengubah data (edit/hapus/tambah/push/simpan)
+// sehingga tetap terblokir meski dipanggil langsung lewat console/devtools.
+function isViewerRole(){
+  var acct = S.accounts && S.accounts.find(function(a){ return a.username===S.currentUser; });
+  return !!(acct && acct.role==='viewer');
+}
+function blockIfViewer(msg){
+  if(isViewerRole()){
+    addNotif(msg||'Mode viewer: hanya dapat melihat data, tidak dapat melakukan perubahan','warn');
+    return true;
+  }
+  return false;
+}
+
+
 function enterApp(acct){
   var lw = document.getElementById('login-wrap');
   var tb = document.getElementById('topbar');
@@ -1491,6 +1545,10 @@ function enterApp(acct){
 // ── NAVIGATION ─────────────────────────────────────────
 // ── NAVIGATION ─────────────────────────────────────────
 function goPage(p){
+  if(isViewerRole() && p!=='gaji'){
+    addNotif('Mode viewer: hanya dapat mengakses halaman Data Gaji (lihat & cari)','warn');
+    p='gaji';
+  }
   document.querySelectorAll('.page').forEach(e=>e.classList.remove('on'));
   document.querySelectorAll('.nav-it').forEach(e=>e.classList.remove('on'));
   const pg=g('page-'+p),nv=g('nv-'+p);
@@ -1568,7 +1626,7 @@ function switchP(pid){S.activePid=pid;saveS();const b=BULAN_MAP.find(x=>x.pid===
 // ── EXCEL PARSER ────────────────────────────────────────
 function openUploadOverlay(){g('upload-overlay').classList.add('on');}
 function closeUploadOverlay(){g('upload-overlay').classList.remove('on');}
-async function handleFileUpload(input){
+async function handleFileUpload(input){if(blockIfViewer())return;
   const file=input.files[0];if(!file)return;
   const msg=g('upload-msg');const bar=g('upload-bar');const prog=g('upload-progress');
   msg.textContent='Membaca file…';prog.style.display='block';bar.style.width='20%';
@@ -1934,7 +1992,7 @@ function renderPosisi(){
 
   // Nilai dari baris sheet (lebih akurat dari kalkulasi lokal)
 }
-function openSaldoEdit(i){
+function openSaldoEdit(i){if(blockIfViewer())return;
   saldoEditIdx=i;
   const s=S.saldoRaw[i]||{};
   const nm=g('saldo-edit-nm');
@@ -1973,7 +2031,7 @@ function recalcSaldoSubtotal(){
   });
 }
 
-function saveSaldoEdit(){
+function saveSaldoEdit(){if(blockIfViewer())return;
   if(saldoEditIdx<0)return;
   if(!S.saldoRaw[saldoEditIdx])S.saldoRaw[saldoEditIdx]={rekening:'',sn:0,sni:0,cad:0};
   const s=S.saldoRaw[saldoEditIdx];
@@ -1989,7 +2047,7 @@ function saveSaldoEdit(){
   renderPosisi();
   if(syncPrefs.onEdit&&syncPrefs.url)pushSaldoToSheet();
 }
-function editSaldoAR(){
+function editSaldoAR(){if(blockIfViewer())return;
   var cur=S.saldoAR||0;
   var m=document.createElement('div');
   m.className='mov on';
@@ -2018,7 +2076,7 @@ function editSaldoAR(){
   }
 }
 
-function saveSaldoAR(btn){
+function saveSaldoAR(btn){if(blockIfViewer())return;
   var el=document.getElementById('ar-input');
   if(!el)return;
   var val=parseInt((el.value||'0').replace(/\D/g,''))||0;
@@ -2029,7 +2087,7 @@ function saveSaldoAR(btn){
   addNotif('Saldo AR disimpan: '+fmtF(val),'ok');
 }
 
-function addRekening(){
+function addRekening(){if(blockIfViewer())return;
   S.saldoRaw.push({rekening:'Rekening Baru',sn:0,sni:0,cad:0});
   saveS();
   renderPosisi();
@@ -2037,9 +2095,9 @@ function addRekening(){
   setTimeout(()=>openSaldoEdit(S.saldoRaw.length-1),100);
 }
 
-function promptSaldoReady(){const v=prompt('Override Saldo Ready (Rp):');if(v!==null&&v.trim()!==''){const n=parseFloat(v.replace(/\D/g,''));if(!isNaN(n)){S.saldoReadyOverride=n;saveS();renderPosisi();}}}
-function promptArPot(){const v=prompt('AR Potensial (Rp):',S.arPotensial||0);if(v!==null){S.arPotensial=parseFloat(v.replace(/\D/g,''))||0;saveS();renderPosisi();}}
-async function pushSaldoToSheet(){
+function promptSaldoReady(){if(blockIfViewer())return;const v=prompt('Override Saldo Ready (Rp):');if(v!==null&&v.trim()!==''){const n=parseFloat(v.replace(/\D/g,''));if(!isNaN(n)){S.saldoReadyOverride=n;saveS();renderPosisi();}}}
+function promptArPot(){if(blockIfViewer())return;const v=prompt('AR Potensial (Rp):',S.arPotensial||0);if(v!==null){S.arPotensial=parseFloat(v.replace(/\D/g,''))||0;saveS();renderPosisi();}}
+async function pushSaldoToSheet(){if(blockIfViewer())return;
   const url=(syncPrefs.url||'').trim();
   if(!url){addNotif('URL Sheets belum dikonfigurasi','warn');goPage('settings');return;}
   if(!S.saldoRaw||!S.saldoRaw.length){addNotif('Tidak ada data saldo untuk dikirim','warn');return;}
@@ -2315,14 +2373,14 @@ function renderGajiSummary(d){
   </div>`;
 }
 
-function onNomInput(el,sIdx){
+function onNomInput(el,sIdx){if(blockIfViewer())return;
   const raw=el.value.replace(/\D/g,'');const num=parseInt(raw)||0;
   const pos=el.selectionStart;el.value=num?num.toLocaleString('id-ID'):'';
   el.classList.toggle('zero',!num);
   onCellChange(sIdx,'nominal',num);
 }
 
-function nomKeyNav(e,rowIdx,total){
+function nomKeyNav(e,rowIdx,total){if(blockIfViewer())return;
   if(e.key==='Enter'||e.key==='Tab'){
     e.preventDefault();
     const next=rowIdx+1;if(next>=total)return;
@@ -2330,7 +2388,7 @@ function nomKeyNav(e,rowIdx,total){
   }
 }
 
-function onCellChange(sIdx,field,value){
+function onCellChange(sIdx,field,value){if(blockIfViewer())return;
   if(sIdx<0||sIdx>=S.allSites.length)return;
   const r=S.allSites[sIdx];
   if(field==='nominal')r.nominal=parseFloat(value)||0;
@@ -2393,7 +2451,7 @@ function onCellChange(sIdx,field,value){
   autoSaveTimer=setTimeout(()=>{saveS();const el=g('gaji-info');if(el){const spans=el.querySelectorAll('span');if(spans[2])spans[2].textContent=Object.keys(gajiPendingChanges).length+' perubahan belum di-push';}if(syncPrefs.url){pushGajiToSheet();}},debounceMs);
 }
 
-function openEditSiteModal(sIdx){
+function openEditSiteModal(sIdx){if(blockIfViewer())return;
   const r=S.allSites[sIdx];if(!r)return;
   editingCell={sIdx};
   g('edit-modal-title').textContent='Edit Site: '+r.site;
@@ -2410,7 +2468,7 @@ function openEditSiteModal(sIdx){
   openModal('edit-site-modal');
 }
 
-function saveEditSite(){
+function saveEditSite(){if(blockIfViewer())return;
   const sIdx=editingCell.sIdx;if(sIdx===undefined)return;
   const r=S.allSites[sIdx];if(!r)return;
   const scope=document.querySelector('input[name="edit-scope"]:checked').value;
@@ -2503,7 +2561,7 @@ function pushDebugLog(msg){
 }
 
 let pushInFlight=false, pushStartTime=0;
-async function pushGajiToSheet(manual){
+async function pushGajiToSheet(manual){if(blockIfViewer())return;
   const url=(syncPrefs.url||'').trim();
   if(!url){ pushDebugLog('❌ URL Sheet kosong — cek Pengaturan'); setSaveStatus('error','URL Sheet belum diatur di Pengaturan'); pollPaused=false; return; }
   if(pushInFlight && (Date.now()-pushStartTime>45000)){ pushDebugLog('⚠ Push sebelumnya dianggap stale (>45 detik), reset paksa'); pushInFlight=false; }
@@ -2634,7 +2692,7 @@ function setSaveStatus(state,msg){
 }
 
 // Hapus baris dari data lokal + kirim ke sheet
-function confirmDeleteRow(sIdx){
+function confirmDeleteRow(sIdx){if(blockIfViewer())return;
   const r=S.allSites[sIdx];if(!r)return;
   // Buat custom confirm modal tanpa alert()
   const m=document.createElement('div');m.className='mov on';
@@ -2649,7 +2707,7 @@ function confirmDeleteRow(sIdx){
   m.addEventListener('click',e=>{if(e.target===m)m.remove();});
 }
 
-async function doDeleteRow(sIdx){
+async function doDeleteRow(sIdx){if(blockIfViewer())return;
   const r=S.allSites[sIdx];if(!r)return;
   const deletes=[{pid:r.pid,site:r.site,bu:r.bu}];
   // Hapus dari data lokal
@@ -2673,7 +2731,7 @@ async function doDeleteRow(sIdx){
 }
 
 // ADD SITE
-function saveAddSite(){
+function saveAddSite(){if(blockIfViewer())return;
   const site=vv('as-site').trim();
   if(!site){addNotif('Nama site wajib diisi','warn');return;}
   const tgl=parseInt(vv('as-tgl'));
@@ -2714,7 +2772,7 @@ function saveAddSite(){
   if(syncPrefs.url)pushNewSitesToSheet(newRows);
 }
 
-async function pushNewSitesToSheet(rows){
+async function pushNewSitesToSheet(rows){if(blockIfViewer())return;
   const url=(syncPrefs.url||'').trim();
   if(!url||!rows.length)return;
   try{
@@ -2859,7 +2917,7 @@ function renderHeatmap(){
   g('tren-heatmap').innerHTML=thead+`<tbody>${tbody}</tbody>`;
 }
 
-function exportTrenPNG(){
+function exportTrenPNG(){if(blockIfViewer('Mode viewer: fitur export/unduh tidak tersedia'))return;
   const card=g('tren-chart-card');if(!card){addNotif('Pilih site terlebih dahulu','warn');return;}
   const canvas=g('c-tren-line');if(!canvas)return;
   // Export chart canvas as PNG
@@ -2986,17 +3044,20 @@ function renderAnalisis(){
   chartHtml+='<div class="card nb" style="margin-bottom:16px"><div class="ch"><div class="ct">Nominal per Rekap Jadwal (Belum Release)</div></div>';
   chartHtml+='<div class="cw h260"><canvas id="ai-ch-jadwal"></canvas></div></div>';
 
-  // ── AI OUTPUT ──
-  var prev=aiAnalysisResult||'<div style="text-align:center;padding:28px;color:var(--tx3)"><div style="font-size:1.8462rem;margin-bottom:8px">✨</div>Klik <strong>Analisis Sekarang</strong> untuk mendapatkan analisis cerdas dari AI</div>';
-  var aiHtml='<div class="card nb" id="ai-result-card" style="margin-bottom:0">';
-  aiHtml+='<div class="ch" style="justify-content:space-between"><div class="ct">✦ Analisis AI</div>';
+  // ── AI CHAT ──
+  var aiHtml='<div class="card nb" id="ai-result-card" style="margin-bottom:0;display:flex;flex-direction:column">';
+  aiHtml+='<div class="ch" style="justify-content:space-between"><div class="ct">✦ Asisten AI — Chat</div>';
   aiHtml+='<button class="btn sm" onclick="runAIAnalysis()" id="btn-ai-inline" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border:none;font-weight:700;gap:6px">';
   aiHtml+='<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 2L9.5 9.5 2 12l7.5 2.5L12 22l2.5-7.5L22 12l-7.5-2.5z"/></svg>';
   aiHtml+='Analisis Sekarang</button></div>';
-  aiHtml+='<div id="ai-output" style="padding:16px 20px;min-height:80px;font-size:1rem;line-height:1.7;color:var(--tx2)">'+prev+'</div>';
+  aiHtml+='<div id="ai-chat-list" style="padding:16px 20px;min-height:120px;max-height:480px;overflow-y:auto;display:flex;flex-direction:column;gap:14px"></div>';
+  aiHtml+='<div style="display:flex;gap:8px;padding:12px 16px;border-top:1px solid var(--bd)">';
+  aiHtml+='<input type="text" id="ai-chat-input" placeholder="Tanya sesuatu soal data gaji periode ini…" onkeydown="if(event.key===\'Enter\'){sendAIChatMessage();}" style="flex:1;padding:10px 14px;border-radius:10px;border:1px solid var(--bd2);background:var(--bg2);color:var(--tx);font-family:var(--font);font-size:0.9231rem">';
+  aiHtml+='<button class="btn pri sm" onclick="sendAIChatMessage()" id="btn-ai-chat-send">Kirim</button></div>';
   aiHtml+='</div>';
 
   g('analisis-content').innerHTML = changesHtml + kpiHtml + chartHtml + aiHtml;
+  renderAIChat();
   if(g('ai-live-ind') && !g('ai-live-ind').innerHTML) updateAILiveIndicator('idle');
 
   // ── RENDER CHARTS ──
@@ -3118,7 +3179,7 @@ function toggleApiKeyInput(){
   updateAIHeroStatus();
 }
 
-async function saveGeminiKeyAI(){
+async function saveGeminiKeyAI(){if(blockIfViewer())return;
   const inp=g('gemini-key-inp-ai');
   const k=(inp||{}).value||'';
   if(!k){addNotif('Masukkan API Key terlebih dahulu','warn');return;}
@@ -3132,7 +3193,7 @@ async function saveGeminiKeyAI(){
     try{
       const resp=await fetch(url,{
         method:'POST',
-        headers:{'Content-Type':'application/json'},
+        headers:{'Content-Type':'text/plain;charset=utf-8'},
         body:JSON.stringify({action:'set_config',key:'gemini_api_key',value:k})
       });
       if(resp.ok){
@@ -3157,7 +3218,7 @@ async function saveGeminiKeyAI(){
   setTimeout(()=>{ const bar=g('api-key-bar');if(bar)bar.style.display='none'; },1000);
 }
 
-function clearGeminiKey(){
+function clearGeminiKey(){if(blockIfViewer())return;
   S.geminiKey=''; saveS();
   const inp=g('gemini-key-inp-ai');if(inp)inp.value='';
   const btnClear=g('btn-clear-key');if(btnClear)btnClear.style.display='none';
@@ -3166,7 +3227,7 @@ function clearGeminiKey(){
   addNotif('API Key dihapus','info');
 }
 
-function saveGeminiKey(){
+function saveGeminiKey(){if(blockIfViewer())return;
   const inp=g('gemini-key-inp');
   const k=(inp||{}).value||'';
   S.geminiKey=k; saveS();
@@ -3180,22 +3241,52 @@ function saveGeminiKey(){
 }
 
 // ── AI ANALYSIS dengan Google Gemini ────────────────────────────────
-async function runAIAnalysis(silent){
-  const d=getPeriodSites(); const ap=getAP();
-  if(!d.length){ if(!silent) addNotif('Belum ada data untuk dianalisis','warn'); return; }
+// ── STATE CHAT AI ────────────────────────────────────────────────────
+S.aiChat = S.aiChat || [];
 
-  const url=(syncPrefs.url||'').trim();
+function pushAIChatMessage(role,text,label){
+  S.aiChat = S.aiChat || [];
+  S.aiChat.push({role:role,text:text,label:label||'',time:Date.now()});
+  if(S.aiChat.length>60) S.aiChat = S.aiChat.slice(-60);
+  saveS();
+  renderAIChat();
+}
 
-  const btn=g('btn-ai-analyze')||g('btn-ai-inline');
-  const out=g('ai-output');
-  const loadingHtml='<div style="text-align:center;padding:28px;color:var(--tx3)"><div style="font-size:1.6923rem;margin-bottom:8px;animation:spin 1s linear infinite">✦</div><div style="font-size:1rem;font-weight:600">AI sedang menganalisis data...</div></div>';
-  if(!silent){
-    if(btn){btn.disabled=true;btn.textContent='Menganalisis...';}
-    if(out) out.innerHTML=loadingHtml;
+function renderAIChat(){
+  var box=g('ai-chat-list'); if(!box) return;
+  var arr=S.aiChat||[];
+  if(!arr.length){
+    box.innerHTML='<div style="text-align:center;padding:20px;color:var(--tx3)"><div style="font-size:1.8462rem;margin-bottom:8px">✨</div>Klik <strong>Analisis Sekarang</strong> atau ajukan pertanyaan untuk mulai berdiskusi dengan Asisten AI</div>';
+    return;
   }
-  updateAILiveIndicator('running');
+  box.innerHTML = arr.map(function(m){
+    var time=new Date(m.time).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
+    if(m.role==='user'){
+      return '<div style="align-self:flex-end;max-width:80%"><div style="background:var(--blue);color:#fff;padding:10px 14px;border-radius:14px 14px 3px 14px;font-size:0.9231rem;line-height:1.5">'+escHtml(m.text)+'</div><div style="text-align:right;font-size:0.7308rem;color:var(--tx3);margin-top:3px">'+time+'</div></div>';
+    }
+    var lbl=m.label?'<div style="font-size:0.7692rem;font-weight:700;color:#8b5cf6;margin-bottom:4px">'+m.label+'</div>':'';
+    return '<div style="align-self:flex-start;max-width:92%"><div style="background:var(--bg3);border:1px solid var(--bd);padding:12px 16px;border-radius:3px 14px 14px 14px;font-size:0.9231rem;line-height:1.7;color:var(--tx2)">'+lbl+m.text+'</div><div style="font-size:0.7308rem;color:var(--tx3);margin-top:3px">'+time+'</div></div>';
+  }).join('');
+  box.scrollTop = box.scrollHeight;
+}
 
-  // Siapkan data ringkasan
+function escHtml(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function showAITyping(){
+  var box=g('ai-chat-list'); if(!box) return;
+  var t=document.createElement('div');
+  t.id='ai-typing-bubble';
+  t.style.cssText='align-self:flex-start';
+  t.innerHTML='<div style="background:var(--bg3);border:1px solid var(--bd);padding:10px 16px;border-radius:3px 14px 14px 14px;display:inline-flex;gap:4px"><span class="spin-dot" style="border-color:#8b5cf6;border-top-color:transparent"></span> <span style="font-size:0.8462rem;color:var(--tx3)">Asisten AI mengetik...</span></div>';
+  box.appendChild(t);
+  box.scrollTop = box.scrollHeight;
+}
+function hideAITyping(){
+  var t=g('ai-typing-bubble'); if(t) t.remove();
+}
+
+// ── PROMPT CONTEXT (dipakai bersama oleh analisis penuh & chat) ─────
+function buildGajiContextText(d,ap){
   const tot=d.reduce((a,r)=>a+(r.nominal||0),0);
   const sudah=d.filter(r=>isGajiReleased(r));
   const belum=d.filter(r=>!isGajiReleased(r));
@@ -3208,15 +3299,12 @@ async function runAIAnalysis(silent){
     const v=d.filter(r=>getRG(r.tgl)===rg.l&&!isGajiReleased(r)).reduce((a,r)=>a+(r.nominal||0),0);
     return v>0?rg.l+': '+fmtF(v):'';
   }).filter(Boolean);
-  // Detail tambahan agar analisis lebih rinci
   const areaM={};d.forEach(r=>{const a=r.area||'Lainnya';if(!areaM[a])areaM[a]={n:0,b:0};areaM[a].n+=(r.nominal||0);if(!isGajiReleased(r))areaM[a].b+=(r.nominal||0);});
   const top5Belum=belum.slice().sort((a,b)=>(b.nominal||0)-(a.nominal||0)).slice(0,5);
   const changesTxt=(window.gajiChanges&&window.gajiChanges.length)?window.gajiChanges.join('; '):'Tidak ada perubahan tercatat sejak update terakhir';
-
-  const prompt=`Kamu adalah analis keuangan senior yang menyusun laporan eksekutif untuk seorang Manager Keuangan di PT Jamkrindo Kanwil Surabaya.
-Analisis data monitoring gaji berikut secara MENDALAM dan strategis — bukan sekadar melaporkan angka, tapi jelaskan MAKNA dan DAMPAKNYA terhadap pengambilan keputusan manajerial (cash flow, risiko operasional, prioritas approval, dsb). Tulis dalam Bahasa Indonesia, gaya profesional-eksekutif, dan jangan terlalu singkat.
-
-PERIODE: ${ap.periode}
+  return {
+    tot,sudah,belum,sudN,belN,nalN,bm,zero,jadwalBelum,areaM,top5Belum,changesTxt,
+    text:`PERIODE: ${ap.periode}
 TOTAL GAJI: ${fmtF(tot)} (${d.length} transaksi)
 SUDAH RELEASE: ${fmtF(sudN)} (${sudah.length} site, ${pct(sudN,tot)}%)
 BELUM RELEASE: ${fmtF(belN)} (${belum.length} site, ${pct(belN,tot)}%)
@@ -3235,94 +3323,109 @@ ${top5Belum.map(r=>'- '+r.site+' ('+r.bu+'): '+fmtF(r.nominal)).join(', ')||'Tid
 
 JADWAL BELUM RELEASE: ${jadwalBelum.join(', ')||'Semua sudah release'}
 
-PERUBAHAN SEJAK DATA TERAKHIR DIUPDATE (data mentah, olah jadi insight, JANGAN sekadar disalin ulang sebagai list): ${changesTxt}
+PERUBAHAN SEJAK DATA TERAKHIR DIUPDATE: ${changesTxt}`
+  };
+}
 
-Format respons (WAJIB rinci, gunakan angka dan persentase konkret di tiap bagian):
-## Ringkasan Eksekutif
-[3-5 kalimat, sertakan angka utama, tulis untuk pembaca level manager yang butuh gambaran cepat tapi tetap akurat]
-
-### Status Release & Implikasi Cash Flow
-> **REKOMENDASI** [judul]: [isi rekomendasi detail dengan angka, kaitkan dengan implikasi arus kas/likuiditas]
-
-### Insight dari Perubahan Data Terakhir
-[Jangan cuma sebutkan ulang angka perubahan — jelaskan APA ARTINYA bagi manager: apakah progres release sesuai target, apakah ada perlambatan yang perlu perhatian, apa yang mendorong perubahan tersebut]
-
-### Analisis per Bisnis Unit
-- [per BU, sertakan nominal dan persentase, serta BU mana yang perlu perhatian ekstra]
-
-### Analisis per Area
-- [per area, sertakan nominal]
-
-### Site Prioritas (Belum Release Terbesar)
-- [sebutkan site dari daftar TOP 5, beri alasan kenapa perlu diprioritaskan dan estimasi urgensinya]
-
-### Deteksi Risiko & Anomali
-- [nominal kosong, keterlambatan, ketimpangan antar BU/area, potensi masalah operasional, dll]
-
-### Rekomendasi Strategis untuk Manager
-1. [rekomendasi actionable level manajerial — bukan operasional harian, tapi keputusan/kebijakan]
-
-### Tips Pengelolaan
-> **TIPS** [judul]: [isi tips]
-
-Kesimpulan:
-[kesimpulan singkat, tegas, dan berorientasi keputusan]
-
-Catatan Penting: [disclaimer]`;
-
-  try {
-    var result = null;
-
-    // ═══ UTAMA: Kirim ke Apps Script proxy (API Key di server) ═══
-    if(url){
-      try{
-        const resp = await fetch(url, {
-          method: 'POST',
-          headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({action:'gemini_chat', prompt})
-        });
-        if(resp.ok){
-          const j = await resp.json();
-          if(j.status==='ok' && j.result){
-            result = j.result;
-          } else if(j.status==='error'){
-            // Jika server belum ada key, coba pakai key lokal
-            if(j.message && j.message.includes('belum dikonfigurasi')){
-              addNotif('⚠ API Key belum diset di server — coba key lokal','warn');
-            } else {
-              throw new Error(j.message||'Gemini proxy error');
-            }
+// ── PEMANGGIL GEMINI (dipakai bersama) ───────────────────────────────
+async function callGeminiAPI(prompt){
+  const url=(syncPrefs.url||'').trim();
+  var result=null;
+  if(url){
+    try{
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: {'Content-Type':'text/plain;charset=utf-8'},
+        body: JSON.stringify({action:'gemini_chat', prompt})
+      });
+      if(resp.ok){
+        const j = await resp.json();
+        if(j.status==='ok' && j.result){
+          result = j.result;
+        } else if(j.status==='error'){
+          if(j.message && j.message.includes('belum dikonfigurasi')){
+            addNotif('⚠ API Key belum diset di server — coba key lokal','warn');
+          } else {
+            throw new Error(j.message||'Gemini proxy error');
           }
         }
-      } catch(proxyErr){
-        console.warn('Proxy error:', proxyErr.message);
       }
+    } catch(proxyErr){
+      console.warn('Proxy error:', proxyErr.message);
     }
-
-    // ═══ FALLBACK: Pakai key lokal jika ada ═══
-    if(!result && S.geminiKey){
+  }
+  if(!result && S.geminiKey){
+    try{
       const resp2 = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key='+S.geminiKey,{
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.3,maxOutputTokens:3500}})
+        body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.4,maxOutputTokens:3500}})
       });
       if(resp2.ok){
         const j2=await resp2.json();
         result=j2.candidates?.[0]?.content?.parts?.[0]?.text||'';
       }
-    }
+    } catch(e2){ console.warn('Local key error:', e2.message); }
+  }
+  return result;
+}
+
+// ── ANALISIS PENUH (dipanggil manual atau otomatis saat data berubah) ─
+async function runAIAnalysis(silent){
+  const d=getPeriodSites(); const ap=getAP();
+  if(!d.length){ if(!silent) addNotif('Belum ada data untuk dianalisis','warn'); return; }
+
+  const btn=g('btn-ai-analyze')||g('btn-ai-inline');
+  if(!silent && btn){btn.disabled=true;btn.textContent='Menganalisis...';}
+  showAITyping();
+  updateAILiveIndicator('running');
+
+  const ctx=buildGajiContextText(d,ap);
+
+  const prompt=`Kamu adalah analis keuangan senior yang menyusun laporan eksekutif untuk seorang Manager Keuangan di PT Jamkrindo Kanwil Surabaya.
+Analisis data monitoring gaji berikut secara MENDALAM dan strategis — bukan sekadar melaporkan angka, tapi jelaskan MAKNA dan DAMPAKNYA terhadap pengambilan keputusan manajerial (cash flow, risiko operasional, prioritas approval, dsb). Rekomendasi yang kamu berikan HARUS mencerminkan kondisi data TERBARU saat ini (khususnya bagian "PERUBAHAN SEJAK DATA TERAKHIR DIUPDATE") — jangan mengulang rekomendasi generik yang sama setiap saat. Tulis dalam Bahasa Indonesia, gaya profesional-eksekutif, dan jangan terlalu singkat.
+
+${ctx.text}
+
+Format respons (WAJIB rinci, gunakan angka dan persentase konkret di tiap bagian):
+## Ringkasan Eksekutif
+[3-5 kalimat, sertakan angka utama]
+
+### Status Release & Implikasi Cash Flow
+> **REKOMENDASI** [judul]: [isi rekomendasi detail dengan angka, kaitkan dengan implikasi arus kas/likuiditas]
+
+### Insight dari Perubahan Data Terakhir
+[jelaskan APA ARTINYA perubahan terbaru bagi manager — apakah progres sesuai target, ada perlambatan, dsb]
+
+### Analisis per Bisnis Unit
+- [per BU, sertakan nominal dan persentase, serta BU mana yang perlu perhatian ekstra]
+
+### Site Prioritas (Belum Release Terbesar)
+- [sebutkan site dari daftar TOP 5, beri alasan urgensi]
+
+### Deteksi Risiko & Anomali
+- [nominal kosong, ketimpangan antar BU/area, potensi masalah operasional]
+
+### Rekomendasi Strategis untuk Manager
+1. [rekomendasi actionable level manajerial, spesifik terhadap kondisi data saat ini]
+
+Kesimpulan:
+[kesimpulan singkat, tegas, dan berorientasi keputusan]`;
+
+  try {
+    var result = await callGeminiAPI(prompt);
+    hideAITyping();
 
     if(result){
       aiAnalysisResult=formatAIResponse(result);
-      if(out) out.innerHTML=aiAnalysisResult;
+      pushAIChatMessage('assistant', aiAnalysisResult, silent?'🔄 Update Otomatis · data berubah':'📊 Analisis Baru');
       if(!silent) addNotif('✅ Analisis AI selesai','ok');
       else addNotif('🔄 Analisis AI diperbarui otomatis (data berubah)','info');
     } else {
-      // ═══ FALLBACK LOKAL: Analisis tanpa AI ═══
-      aiAnalysisResult=generateLocalAnalysis(d,ap,tot,sudN,belN,nalN,sudah,belum,zero,bm);
-      if(out) out.innerHTML=aiAnalysisResult;
+      aiAnalysisResult=generateLocalAnalysis(d,ap,ctx.tot,ctx.sudN,ctx.belN,ctx.nalN,ctx.sudah,ctx.belum,ctx.zero,ctx.bm);
+      pushAIChatMessage('assistant', aiAnalysisResult, 'ℹ Analisis Lokal (tanpa AI)');
       if(!silent){
-        if(!url && !S.geminiKey){
+        if(!(syncPrefs.url||'').trim() && !S.geminiKey){
           addNotif('ℹ Menampilkan analisis lokal — hubungkan Google Sheets di Pengaturan untuk analisis AI penuh','info');
         } else {
           addNotif('ℹ Menampilkan analisis lokal — Apps Script tidak merespons, coba lagi','info');
@@ -3331,9 +3434,10 @@ Catatan Penting: [disclaimer]`;
     }
 
   } catch(e){
+    hideAITyping();
     console.error('AI Error:', e);
-    aiAnalysisResult=generateLocalAnalysis(d,ap,tot,sudN,belN,nalN,sudah,belum,zero,bm);
-    if(out) out.innerHTML=aiAnalysisResult;
+    aiAnalysisResult=generateLocalAnalysis(d,ap,ctx.tot,ctx.sudN,ctx.belN,ctx.nalN,ctx.sudah,ctx.belum,ctx.zero,ctx.bm);
+    pushAIChatMessage('assistant', aiAnalysisResult, 'ℹ Analisis Lokal (tanpa AI)');
     if(!silent) addNotif('ℹ Analisis lokal ditampilkan ('+e.message+')','info');
   }
 
@@ -3345,6 +3449,49 @@ Catatan Penting: [disclaimer]`;
   }
   updateAILiveIndicator('idle');
 }
+
+// ── CHAT TANYA-JAWAB BEBAS ────────────────────────────────────────────
+async function sendAIChatMessage(){
+  const inp=g('ai-chat-input'); if(!inp) return;
+  const q=(inp.value||'').trim(); if(!q) return;
+  inp.value='';
+  pushAIChatMessage('user', q, '');
+
+  const d=getPeriodSites(); const ap=getAP();
+  if(!d.length){ pushAIChatMessage('assistant','Belum ada data pada periode aktif untuk dianalisis. Silakan pull data dari Sheet terlebih dahulu.',''); return; }
+
+  showAITyping();
+  const ctx=buildGajiContextText(d,ap);
+  const history=(S.aiChat||[]).slice(-8).filter(function(m){return m.role==='user'||m.role==='assistant';}).map(function(m){
+    var t=(m.text||'').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim().slice(0,400);
+    return (m.role==='user'?'User: ':'Asisten: ')+t;
+  }).join('\n');
+
+  const prompt=`Kamu adalah asisten analisis payroll untuk Manager Keuangan di PT Jamkrindo Kanwil Surabaya, sedang berdiskusi lewat chat.
+Jawab pertanyaan terbaru secara ringkas, akurat, dan actionable, berdasarkan DATA TERKINI di bawah. Jika relevan dengan perubahan data terbaru, sebutkan. Gunakan Bahasa Indonesia profesional, boleh pakai poin-poin, hindari basa-basi panjang.
+
+DATA TERKINI:
+${ctx.text}
+
+RIWAYAT PERCAKAPAN SINGKAT:
+${history||'(belum ada percakapan sebelumnya)'}
+
+PERTANYAAN BARU DARI USER: ${q}`;
+
+  try{
+    var result = await callGeminiAPI(prompt);
+    hideAITyping();
+    if(result){
+      pushAIChatMessage('assistant', formatAIResponse(result), '');
+    } else {
+      pushAIChatMessage('assistant', 'Maaf, saat ini saya tidak bisa terhubung ke layanan Gemini. Pastikan Google Sheets/Apps Script sudah terhubung di Pengaturan, atau coba lagi sebentar lagi.', '');
+    }
+  } catch(e){
+    hideAITyping();
+    pushAIChatMessage('assistant', 'Terjadi kendala saat menghubungi AI ('+e.message+'). Coba lagi sebentar lagi.', '');
+  }
+}
+
 
 // ── LIVE AI INDICATOR ────────────────────────────────────────────────
 let aiLiveDirty=false, aiLiveTimer=null;
@@ -3483,7 +3630,7 @@ function openNoteModal(id){
   else{if(g('note-ttl'))g('note-ttl').value='';if(g('note-body'))g('note-body').value='';if(g('note-tag'))g('note-tag').value='';if(g('note-color'))g('note-color').value='nc-w';if(g('note-pin'))g('note-pin').checked=false;}
   openModal('note-modal');
 }
-function saveNote(){
+function saveNote(){if(blockIfViewer())return;
   const title=vv('note-ttl'),body=vv('note-body'),tag=vv('note-tag'),color=vv('note-color'),pinned=g('note-pin').checked;
   if(!title&&!body){addNotif('Judul atau isi catatan wajib diisi','warn');return;}
   if(noteEditId){
@@ -3500,8 +3647,8 @@ function saveNote(){
   renderNotes();
   addNotif(noteEditId?'Catatan berhasil diperbarui':'Catatan baru berhasil ditambahkan','ok');
 }
-function delNote(id){S.notes=S.notes.filter(n=>n.id!==id);saveS();renderNotes();}
-function togglePin(id){const n=S.notes.find(x=>x.id===id);if(n){n.pinned=!n.pinned;saveS();renderNotes();}}
+function delNote(id){if(blockIfViewer())return;S.notes=S.notes.filter(n=>n.id!==id);saveS();renderNotes();}
+function togglePin(id){if(blockIfViewer())return;const n=S.notes.find(x=>x.id===id);if(n){n.pinned=!n.pinned;saveS();renderNotes();}}
 
 // ── SETTINGS ────────────────────────────────────────────
 function renderSettings(){
@@ -3535,19 +3682,19 @@ function renderSettings(){
   // Sync
   loadSyncPrefs();
 }
-function savePref(){
+function savePref(){if(blockIfViewer())return;
   const u=S.accounts.find(a=>a.username===S.currentUser);
   if(!u)return;u.name=vv('pf-nama')||u.name;u.jabatan=vv('pf-jabatan');u.email=vv('pf-email');
   saveS();showAl('pf-al','Profil berhasil disimpan','ok');
   if(g('tb-av'))g('tb-av').textContent=u.name[0]||'A';if(g('tb-uname'))g('tb-uname').textContent=u.name;
 }
-function changePw(){
+function changePw(){if(blockIfViewer())return;
   const np=vv('pw-new'),cf=vv('pw-cfm');
   if(!np||np.length<6){showAl('pw-al','Password minimal 6 karakter','er');return;}
   if(np!==cf){showAl('pw-al','Konfirmasi password tidak cocok','er');return;}
   const u=S.accounts.find(a=>a.username===S.currentUser);if(u){u.pw=np;saveS();showAl('pw-al','Password berhasil diubah','ok');}
 }
-function addAccount(){
+function addAccount(){if(blockIfViewer())return;
   const user=vv('na-user').trim(),name=vv('na-name').trim(),jbt=vv('na-jbt'),pass=vv('na-pass'),role=vv('na-role');
   if(!user||!name||!pass){showAl('acct-al','Username, nama, dan password wajib diisi','er');return;}
   if(S.accounts.find(a=>a.username===user)){showAl('acct-al','Username sudah ada','er');return;}
@@ -3557,8 +3704,8 @@ function addAccount(){
   saveS();showAl('acct-al','Akun berhasil ditambahkan','ok');
   ['na-user','na-name','na-jbt','na-pass'].forEach(id=>{if(g(id))g(id).value='';});renderSettings();
 }
-function delAcct(uname){if(uname===S.currentUser){alert('Tidak dapat menghapus akun sendiri');return;}S.accounts=S.accounts.filter(a=>a.username!==uname);saveS();renderSettings();}
-function savePeriod(){const lbl=vv('np-lbl'),id=vv('np-id');if(!lbl||!id){alert('Label wajib diisi');return;}BULAN_MAP.push({pid:id,nama:lbl.split(' – ')[1]||lbl,periode:lbl});closeModal('add-period-modal');renderSettings();}
+function delAcct(uname){if(blockIfViewer())return;if(uname===S.currentUser){alert('Tidak dapat menghapus akun sendiri');return;}S.accounts=S.accounts.filter(a=>a.username!==uname);saveS();renderSettings();}
+function savePeriod(){if(blockIfViewer())return;const lbl=vv('np-lbl'),id=vv('np-id');if(!lbl||!id){alert('Label wajib diisi');return;}BULAN_MAP.push({pid:id,nama:lbl.split(' – ')[1]||lbl,periode:lbl});closeModal('add-period-modal');renderSettings();}
 
 // ── KONFIGURASI EXPORT ──────────────────────────────────
 const EXPORT_FORMATS = {
@@ -3639,7 +3786,7 @@ function fillExpPer(){
 }
 
 // ── EXPORT MASTER ──────────────────────────────────────
-async function doExport(){
+async function doExport(){if(blockIfViewer('Mode viewer: fitur export/unduh tidak tersedia'))return;
   const scope=document.querySelector('input[name="escope"]:checked')?.value||'gaji';
   const fmt=document.querySelector('input[name="efmt"]:checked')?.value||'xlsx';
   const pids=getExportPids();
@@ -3669,7 +3816,7 @@ async function doExport(){
   closeModal('export-modal');
 }
 
-function printScope(scope,pids){
+function printScope(scope,pids){if(blockIfViewer('Mode viewer: fitur export/unduh tidak tersedia'))return;
   goPage({gaji:'gaji',saldo:'posisi',rekap:'rekap',analisis:'analisis'}[scope]);
   setTimeout(()=>window.print(),300);
 }
@@ -3681,7 +3828,7 @@ function gajiRowsFor(pids){
     'Area':r.area,'Nalangi':r.nal,'HC':r.hc,'Nominal (Rp)':r.nominal,'Tgl Realisasi':r.tgl_r,'Status':gajiStatusText(r)
   }));
 }
-function exportGajiXLSX(pids){
+function exportGajiXLSX(pids){if(blockIfViewer('Mode viewer: fitur export/unduh tidak tersedia'))return;
   const rows=gajiRowsFor(pids);
   if(!rows.length){addNotif('Tidak ada data untuk periode terpilih','warn');return;}
   const ws=XLSX.utils.json_to_sheet(rows);
@@ -3691,7 +3838,7 @@ function exportGajiXLSX(pids){
   XLSX.writeFile(wb,`MonitoringGaji_DataGaji_${label}.xlsx`);
   addNotif('Export Data Gaji (Excel) berhasil — '+rows.length+' baris','ok');
 }
-function exportGajiCSV(pids){
+function exportGajiCSV(pids){if(blockIfViewer('Mode viewer: fitur export/unduh tidak tersedia'))return;
   const rows=gajiRowsFor(pids);
   if(!rows.length){addNotif('Tidak ada data untuk periode terpilih','warn');return;}
   downloadCSV(rows,'MonitoringGaji_DataGaji_'+(pids.length===1?pids[0]:'multi'));
@@ -3699,7 +3846,7 @@ function exportGajiCSV(pids){
 }
 
 // ── EXPORT: POSISI SALDO ─────────────────────────────────
-function exportSaldoXLSX(pids){
+function exportSaldoXLSX(pids){if(blockIfViewer('Mode viewer: fitur export/unduh tidak tersedia'))return;
   const saldoData=S.saldoRaw&&S.saldoRaw.length?S.saldoRaw:[];
   const rows=saldoData.map(s=>({'Nama Rekening':s.rekening,'SN-GSU (Rp)':s.sn||0,'SNI-SIG-RCI-ION (Rp)':s.sni||0,'Cadangan Kas (Rp)':s.cad||0}));
   const totSN=saldoData.reduce((a,s)=>a+(s.sn||0),0);
@@ -3726,7 +3873,7 @@ function exportSaldoXLSX(pids){
   XLSX.writeFile(wb,`MonitoringGaji_PosisiSaldo_${S.activePid}.xlsx`);
   addNotif('Export Posisi Saldo (Excel) berhasil','ok');
 }
-function exportSaldoCSV(pids){
+function exportSaldoCSV(pids){if(blockIfViewer('Mode viewer: fitur export/unduh tidak tersedia'))return;
   const saldoData=S.saldoRaw&&S.saldoRaw.length?S.saldoRaw:[];
   const rows=saldoData.map(s=>({'Nama Rekening':s.rekening,'SN-GSU':s.sn||0,'SNI-SIG-RCI-ION':s.sni||0,'Cadangan Kas':s.cad||0}));
   if(!rows.length){addNotif('Belum ada data saldo','warn');return;}
@@ -3750,7 +3897,7 @@ function rekapRowsFor(pids){
   });
   return rows;
 }
-function exportRekapXLSX(pids){
+function exportRekapXLSX(pids){if(blockIfViewer('Mode viewer: fitur export/unduh tidak tersedia'))return;
   const rows=rekapRowsFor(pids);
   if(!rows.length){addNotif('Tidak ada data untuk periode terpilih','warn');return;}
   const ws=XLSX.utils.json_to_sheet(rows);ws['!cols']=[{wch:24},{wch:14},{wch:16},{wch:18},{wch:16}];
@@ -3758,7 +3905,7 @@ function exportRekapXLSX(pids){
   XLSX.writeFile(wb,`MonitoringGaji_RekapJadwal_${pids.length===1?pids[0]:'multi'}.xlsx`);
   addNotif('Export Rekap Jadwal (Excel) berhasil','ok');
 }
-function exportRekapCSV(pids){
+function exportRekapCSV(pids){if(blockIfViewer('Mode viewer: fitur export/unduh tidak tersedia'))return;
   const rows=rekapRowsFor(pids);
   if(!rows.length){addNotif('Tidak ada data untuk periode terpilih','warn');return;}
   downloadCSV(rows,'MonitoringGaji_RekapJadwal_'+(pids.length===1?pids[0]:'multi'));
@@ -3778,7 +3925,7 @@ function trenRowsFor(){
     return row;
   });
 }
-function exportTrenXLSX(){
+function exportTrenXLSX(){if(blockIfViewer('Mode viewer: fitur export/unduh tidak tersedia'))return;
   const rows=trenRowsFor();
   if(!rows.length){addNotif('Belum ada data site','warn');return;}
   const ws=XLSX.utils.json_to_sheet(rows);
@@ -3787,7 +3934,7 @@ function exportTrenXLSX(){
   XLSX.writeFile(wb,'MonitoringGaji_TrenGaji_AllSites.xlsx');
   addNotif('Export Tren Gaji (Excel) berhasil — '+rows.length+' site','ok');
 }
-function exportTrenCSV(){
+function exportTrenCSV(){if(blockIfViewer('Mode viewer: fitur export/unduh tidak tersedia'))return;
   const rows=trenRowsFor();
   if(!rows.length){addNotif('Belum ada data site','warn');return;}
   downloadCSV(rows,'MonitoringGaji_TrenGaji_AllSites');
@@ -3795,7 +3942,7 @@ function exportTrenCSV(){
 }
 
 // ── EXPORT: SEMUA DATA (multi-sheet) ────────────────────
-function exportAllXLSX(pids){
+function exportAllXLSX(pids){if(blockIfViewer('Mode viewer: fitur export/unduh tidak tersedia'))return;
   const wb=XLSX.utils.book_new();
 
   // Sheet 1: Data Gaji
@@ -3849,7 +3996,7 @@ function exportAllXLSX(pids){
 }
 
 // ── EXPORT: PPTX LENGKAP (Analisis / Semua Data) ────────
-async function exportPPTX(pid){
+async function exportPPTX(pid){if(blockIfViewer('Mode viewer: fitur export/unduh tidak tersedia'))return;
   try{
     addNotif('Menyiapkan PowerPoint…','info');
     const pptx=new PptxGenJS();pptx.layout='LAYOUT_WIDE';
@@ -3945,7 +4092,7 @@ async function exportPPTX(pid){
 }
 
 // ── HELPER: CSV downloader ───────────────────────────────
-function downloadCSV(rows,filename){
+function downloadCSV(rows,filename){if(blockIfViewer('Mode viewer: fitur export/unduh tidak tersedia'))return;
   if(!rows.length)return;
   const headers=Object.keys(rows[0]);
   const csvRows=rows.map(r=>headers.map(h=>{
@@ -3959,8 +4106,8 @@ function downloadCSV(rows,filename){
   a.download=filename+'.csv';a.click();
 }
 
-function backupData(){const json=JSON.stringify(S,null,2);const a=document.createElement('a');a.href='data:application/json;charset=utf-8,'+encodeURIComponent(json);a.download='backup_allbu_'+todayISO()+'.json';a.click();addNotif('Backup JSON berhasil','ok');}
-function clearAll(){
+function backupData(){if(blockIfViewer())return;const json=JSON.stringify(S,null,2);const a=document.createElement('a');a.href='data:application/json;charset=utf-8,'+encodeURIComponent(json);a.download='backup_allbu_'+todayISO()+'.json';a.click();addNotif('Backup JSON berhasil','ok');}
+function clearAll(){if(blockIfViewer())return;
   const conf=g('confirm-clear-modal');
   if(!conf){
     // Custom confirm menggunakan modal kecil
@@ -3969,7 +4116,7 @@ function clearAll(){
     document.body.appendChild(m);m.addEventListener('click',e=>{if(e.target===m)m.remove();});
   }
 }
-function doReset(){localStorage.removeItem('pts_v6');location.reload();}
+function doReset(){if(blockIfViewer())return;localStorage.removeItem('pts_v6');location.reload();}
 
 // ── TAMPILAN ────────────────────────────────────────────
 function toggleTheme(){
@@ -4041,8 +4188,8 @@ function loadSyncPrefs(){
   const sc=g('sync-confirm');if(sc)sc.checked=syncPrefs.confirmPull!==false;
   updateSyncUI();
 }
-function saveSyncURL(){syncPrefs.url=vv('gsheet-url');localStorage.setItem('pts_sync',JSON.stringify(syncPrefs));}
-function saveSyncPrefs(){syncPrefs.onLogin=g('sync-login')?.checked||false;syncPrefs.onEdit=g('sync-edit')?.checked||false;syncPrefs.confirmPull=g('sync-confirm')?.checked!==false;localStorage.setItem('pts_sync',JSON.stringify(syncPrefs));}
+function saveSyncURL(){if(blockIfViewer())return;syncPrefs.url=vv('gsheet-url');localStorage.setItem('pts_sync',JSON.stringify(syncPrefs));}
+function saveSyncPrefs(){if(blockIfViewer())return;syncPrefs.onLogin=g('sync-login')?.checked||false;syncPrefs.onEdit=g('sync-edit')?.checked||false;syncPrefs.confirmPull=g('sync-confirm')?.checked!==false;localStorage.setItem('pts_sync',JSON.stringify(syncPrefs));}
 function updateSyncUI(){
   const ok=!!(syncPrefs.url&&S.lastSync);
   const badge=g('sync-badge'),dot=g('sync-dot'),txt=g('sync-txt'),topOk=g('tb-sync-ok');
@@ -4446,8 +4593,12 @@ function initUI(acct){
       }
     }
 
-    // Render dashboard pertama kali
-    setTimeout(renderDash, 80);
+    // Render dashboard pertama kali (viewer selalu diarahkan ke halaman Gaji saja)
+    if(isViewerRole()){
+      setTimeout(function(){ goPage('gaji'); }, 80);
+    } else {
+      setTimeout(renderDash, 80);
+    }
 
     // Notifikasi selamat datang
     setTimeout(()=>addNotif('Selamat datang, '+nm+'!','info'), 300);
