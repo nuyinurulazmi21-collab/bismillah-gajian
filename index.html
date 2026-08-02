@@ -3322,30 +3322,38 @@ function buildGajiContextText(d,ap){
   const sudN=sudah.reduce((a,r)=>a+(r.nominal||0),0);
   const belN=belum.reduce((a,r)=>a+(r.nominal||0),0);
   const nalN=d.filter(r=>r.nal==='NALANGI').reduce((a,r)=>a+(r.nominal||0),0);
-  const bm={};d.forEach(r=>{if(!bm[r.bu])bm[r.bu]={n:0,hc:0,b:0};bm[r.bu].n+=(r.nominal||0);bm[r.bu].hc+=(r.hc||0);if(!isGajiReleased(r))bm[r.bu].b+=(r.nominal||0);});
+  const bm={};d.forEach(r=>{
+    if(!bm[r.bu])bm[r.bu]={n:0,hc:0,b:0,cnt:0,belCnt:0,sudCnt:0};
+    bm[r.bu].n+=(r.nominal||0);bm[r.bu].hc+=(r.hc||0);bm[r.bu].cnt++;
+    if(!isGajiReleased(r)){bm[r.bu].b+=(r.nominal||0);bm[r.bu].belCnt++;} else {bm[r.bu].sudCnt++;}
+  });
   const zero=d.filter(r=>!r.nominal||r.nominal===0);
   const jadwalBelum=REKAP_GROUPS.map(rg=>{
     const v=d.filter(r=>getRG(r.tgl)===rg.l&&!isGajiReleased(r)).reduce((a,r)=>a+(r.nominal||0),0);
     return v>0?rg.l+': '+fmtF(v):'';
   }).filter(Boolean);
-  const areaM={};d.forEach(r=>{const a=r.area||'Lainnya';if(!areaM[a])areaM[a]={n:0,b:0};areaM[a].n+=(r.nominal||0);if(!isGajiReleased(r))areaM[a].b+=(r.nominal||0);});
+  const areaM={};d.forEach(r=>{const a=r.area||'Lainnya';if(!areaM[a])areaM[a]={n:0,b:0,cnt:0,belCnt:0};areaM[a].n+=(r.nominal||0);areaM[a].cnt++;if(!isGajiReleased(r)){areaM[a].b+=(r.nominal||0);areaM[a].belCnt++;}});
   const top5Belum=belum.slice().sort((a,b)=>(b.nominal||0)-(a.nominal||0)).slice(0,5);
+  const belumPerBuList=belum.reduce((m,r)=>{(m[r.bu]=m[r.bu]||[]).push(r.site);return m;},{});
   const changesTxt=(window.gajiChanges&&window.gajiChanges.length)?window.gajiChanges.join('; '):'Tidak ada perubahan tercatat sejak update terakhir';
   return {
     tot,sudah,belum,sudN,belN,nalN,bm,zero,jadwalBelum,areaM,top5Belum,changesTxt,
     text:`PERIODE: ${ap.periode}
-TOTAL GAJI: ${fmtF(tot)} (${d.length} transaksi)
+TOTAL GAJI: ${fmtF(tot)} (${d.length} site/transaksi)
 SUDAH RELEASE: ${fmtF(sudN)} (${sudah.length} site, ${pct(sudN,tot)}%)
 BELUM RELEASE: ${fmtF(belN)} (${belum.length} site, ${pct(belN,tot)}%)
 NALANGI: ${fmtF(nalN)} (${pct(nalN,tot)}%)
 HEAD COUNT: ${d.reduce((a,r)=>a+(r.hc||0),0)}
 NOMINAL KOSONG: ${zero.length} site
 
-PER BISNIS UNIT:
-${Object.entries(bm).map(([b,v])=>'- '+b+': Total '+fmtF(v.n)+', Belum Release '+fmtF(v.b)+', HC '+v.hc).join(', ')}
+PER BISNIS UNIT (jumlah site, BUKAN cuma nominal):
+${Object.entries(bm).map(([b,v])=>'- '+b+': '+v.cnt+' site total ('+v.sudCnt+' sudah release, '+v.belCnt+' belum release), Total Nominal '+fmtF(v.n)+', Belum Release '+fmtF(v.b)+', HC '+v.hc).join('\n')}
+
+DAFTAR NAMA SITE BELUM RELEASE PER BU:
+${Object.entries(belumPerBuList).map(([b,sites])=>'- '+b+' ('+sites.length+' site): '+sites.join(', ')).join('\n')||'Semua sudah release'}
 
 PER AREA:
-${Object.entries(areaM).map(([a,v])=>'- '+a+': Total '+fmtF(v.n)+', Belum Release '+fmtF(v.b)).join(', ')}
+${Object.entries(areaM).map(([a,v])=>'- '+a+': '+v.cnt+' site ('+v.belCnt+' belum release), Total '+fmtF(v.n)+', Belum Release '+fmtF(v.b)).join('\n')}
 
 TOP 5 SITE BELUM RELEASE (nominal terbesar):
 ${top5Belum.map(r=>'- '+r.site+' ('+r.bu+'): '+fmtF(r.nominal)).join(', ')||'Tidak ada'}
@@ -3497,7 +3505,13 @@ async function sendAIChatMessage(){
   }).join('\n');
 
   const prompt=`Kamu adalah asisten analisis payroll untuk Manager Keuangan di PT Jamkrindo Kanwil Surabaya, sedang berdiskusi lewat chat.
-Jawab pertanyaan terbaru secara ringkas, akurat, dan actionable, berdasarkan DATA TERKINI di bawah. Jika relevan dengan perubahan data terbaru, sebutkan. Gunakan Bahasa Indonesia profesional, boleh pakai poin-poin, hindari basa-basi panjang.
+
+ATURAN WAJIB:
+1. Jawab HANYA berdasarkan angka yang benar-benar ada di "DATA TERKINI" di bawah — JANGAN pernah mengarang, menaksir, atau membulatkan angka yang tidak ada di data.
+2. Jika user menanyakan jumlah/angka spesifik (mis. "berapa site", "berapa total"), JAWAB LANGSUNG dengan angka pastinya di kalimat pertama, baru boleh ditambah penjelasan singkat setelahnya. Jangan malah membuka dengan daftar/list yang tidak menjawab pertanyaan.
+3. Jika data yang diminta tidak tersedia di "DATA TERKINI", katakan terus terang datanya tidak tersedia — jangan menebak.
+4. Selalu jawab dalam Bahasa Indonesia, walau ada istilah asing dalam data.
+5. Ringkas dan to the point, hindari basa-basi panjang atau format laporan penuh kecuali diminta.
 
 DATA TERKINI:
 ${ctx.text}
