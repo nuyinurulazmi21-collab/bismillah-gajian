@@ -1811,11 +1811,12 @@ function openKpiDrw(key){
   else if(key==='nal'){ttl='NALANGI';rows=d.filter(r=>r.nal==='NALANGI');}
   else if(key==='tdk'){ttl='TIDAK NALANGI';rows=d.filter(r=>r.nal==='TIDAK');}
   const totR=rows.reduce((a,r)=>a+(r.nominal||0),0);
+  const fmtAudit=r=>r.updatedBy?`<span title="${r.updatedBy} · ${r.updatedAt?new Date(r.updatedAt).toLocaleString('id-ID'):''}" style="font-size:0.7692rem;color:var(--tx3);cursor:help">👤 ${r.updatedBy}</span>`:'<span style="color:var(--tx3);font-size:0.7692rem">—</span>';
   g('drw-ttl').textContent=ttl;
   g('drw-body').innerHTML=`<div style="font-size:0.9231rem;color:var(--tx2);margin-bottom:12px">${rows.length} site · ${fmtF(totR)}</div>
-    <div class="twrap"><table><thead><tr><th>Rekap</th><th>BU</th><th>Site</th><th class="r">Nominal</th><th class="c">Status</th></tr></thead>
-    <tbody>${rows.sort((a,b)=>a.tgl-b.tgl).map(r=>`<tr><td>${rkB(getRG(r.tgl))}</td><td>${buB(r.bu)}</td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.site}</td><td class="r" style="font-weight:700">${fmtF(r.nominal)}</td><td class="c">${isGajiReleased(r)?'<span class="b bG sts-r">✓</span>':'<span class="b bO sts-b">⏳</span>'}</td></tr>`).join('')}</tbody>
-    <tfoot><tr><td colspan="3">TOTAL</td><td class="r">${fmtF(totR)}</td><td></td></tr></tfoot></table></div>`;
+    <div class="twrap"><table><thead><tr><th>Rekap</th><th>BU</th><th>Site</th><th class="r">Nominal</th><th class="c">Status</th><th>Diubah</th></tr></thead>
+    <tbody>${rows.sort((a,b)=>a.tgl-b.tgl).map(r=>`<tr><td>${rkB(getRG(r.tgl))}</td><td>${buB(r.bu)}</td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.site}</td><td class="r" style="font-weight:700">${fmtF(r.nominal)}</td><td class="c">${isGajiReleased(r)?'<span class="b bG sts-r">✓</span>':'<span class="b bO sts-b">⏳</span>'}</td><td>${fmtAudit(r)}</td></tr>`).join('')}</tbody>
+    <tfoot><tr><td colspan="3">TOTAL</td><td class="r">${fmtF(totR)}</td><td></td><td></td></tr></tfoot></table></div>`;
   g('kpi-drw').classList.add('on');
 }
 
@@ -2332,7 +2333,7 @@ function renderGaji(){
       <option ${r.bu==='RCI'?'selected':''}>RCI</option>
       <option ${r.bu==='ION'?'selected':''}>ION</option>
     </select></td>
-    <td><span class="ie-site-nm" title="${r.site}">${r.site}</span></td>
+    <td><span class="ie-site-nm" title="${r.site}${r.updatedBy?'\n👤 Diubah oleh '+r.updatedBy+' · '+new Date(r.updatedAt).toLocaleString('id-ID'):''}">${r.site}</span></td>
     <td><span class="b bN" style="font-size:0.7308rem">${r.area}</span></td>
     <td class="c">${r.nal==='NALANGI'?'<span class="b bB">NALANGI</span>':'<span class="b bN">TIDAK</span>'}</td>
     <td class="r"><input type="number" class="ie-sel" style="width:72px;text-align:right" value="${r.hc||0}" onchange="onCellChange(${sIdx},'hc',this.value)" title="Edit HC"></td>
@@ -2415,6 +2416,10 @@ function onCellChange(sIdx,field,value){if(blockIfViewer())return;
   else if(field==='area')r.area=value;
   else if(field==='bu')r.bu=value;
   else if(field==='site')r.site=value;
+
+  // ── AUDIT TRAIL: catat siapa & kapan terakhir mengubah baris ini ──
+  r.updatedBy=S.currentUser||'?';
+  r.updatedAt=new Date().toISOString();
 
   // Auto-derive status: TGL RELEASE terisi + nominal > 0 = Sudah Direlease
   if(field==='tgl_r'||field==='nominal'){
@@ -2505,6 +2510,8 @@ function saveEditSite(){if(blockIfViewer())return;
 
   // Terapkan ke site ini
   Object.assign(r,newData);
+  r.updatedBy=S.currentUser||'?';
+  r.updatedAt=new Date().toISOString();
 
   // Daftarkan SEMUA field yang diubah lewat modal ini ke gajiPendingChanges
   // agar benar-benar terkirim ke Sheet (sebelumnya hanya field 'site' yang terdaftar,
