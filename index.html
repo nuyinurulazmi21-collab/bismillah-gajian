@@ -3283,6 +3283,11 @@ function pushAIChatMessage(role,text,label){
 
 function renderAIChat(){
   var box=g('ai-chat-list'); if(!box) return;
+  // Bersihkan riwayat lama yang masih menyimpan pesan "Update Otomatis" (fitur ini sudah dinonaktifkan)
+  if(S.aiChat && S.aiChat.some(function(m){return m.label&&m.label.indexOf('Update Otomatis')>-1;})){
+    S.aiChat=S.aiChat.filter(function(m){return !(m.label&&m.label.indexOf('Update Otomatis')>-1);});
+    saveS();
+  }
   var arr=S.aiChat||[];
   if(!arr.length){
     box.innerHTML='<div style="text-align:center;padding:20px;color:var(--tx3)"><div style="font-size:1.8462rem;margin-bottom:8px">✨</div>Klik <strong>Analisis Sekarang</strong> atau ajukan pertanyaan untuk mulai berdiskusi dengan Asisten AI</div>';
@@ -3551,15 +3556,10 @@ function updateAILiveIndicator(state){
 }
 // Dipanggil setiap kali data berubah (dari sync user lain / edit sendiri) — auto re-generate analisis AI
 function scheduleAILiveRefresh(){
-  aiLiveDirty=true;
-  if(aiLiveTimer) return; // sudah ada jadwal berjalan, tunggu batch berikutnya
-  aiLiveTimer=setTimeout(()=>{
-    aiLiveTimer=null;
-    if(aiLiveDirty){
-      aiLiveDirty=false;
-      runAIAnalysis(true); // silent — live update di background
-    }
-  }, 4000); // batch perubahan dalam 4 detik agar tidak spam Gemini tiap 1 edit kecil
+  // Dinonaktifkan: dulu fungsi ini otomatis mengirim pesan "Update Otomatis" ke
+  // chat Asisten AI setiap kali data berubah. Sekarang analisis hanya berjalan
+  // kalau user memicu sendiri (klik "Analisis Sekarang" atau tanya di chat).
+  return;
 }
 
 
