@@ -1007,7 +1007,12 @@ body.dark .saldo-tbl tfoot td{background:var(--bg3);color:var(--tx2)}
       </div>
       <div id="ai-live-ind" style="margin-top:4px;font-size:0.8077rem;display:flex;align-items:center;gap:6px;color:var(--tx3)"></div>
     </div>
-    <div style="flex-shrink:0">
+    <div style="flex-shrink:0;display:flex;gap:8px;align-items:center">
+      <button onclick="toggleApiKeyInput()" id="btn-set-key" title="Atur API Key Gemini"
+        style="display:inline-flex;align-items:center;gap:6px;padding:10px 16px;border:1px solid var(--bd2);border-radius:10px;background:var(--bg2);color:var(--tx2);font-size:0.8846rem;font-weight:600;cursor:pointer;white-space:nowrap">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.6 15a1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.6a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09c0 .68.39 1.29 1 1.51.63.24 1.35.11 1.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06c-.44.47-.57 1.19-.33 1.82.22.61.83 1 1.51 1H21a2 2 0 110 4h-.09c-.68 0-1.29.39-1.51 1z"/></svg>
+        API Key
+      </button>
       <button onclick="runAIAnalysis()" id="btn-ai-analyze"
         style="display:inline-flex;align-items:center;gap:8px;padding:10px 24px;border:none;border-radius:10px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;font-size:1rem;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(99,102,241,.35);white-space:nowrap"
         onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">
@@ -1016,8 +1021,19 @@ body.dark .saldo-tbl tfoot td{background:var(--bg3);color:var(--tx2)}
       </button>
     </div>
   </div>
+  <div id="api-key-bar" style="display:none;background:var(--bg2);border:1px solid var(--bd2);border-radius:12px;padding:14px 16px;margin-bottom:16px">
+    <div style="font-size:0.8462rem;font-weight:700;color:var(--tx2);margin-bottom:8px">Gemini API Key</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <input type="password" id="gemini-key-inp-ai" placeholder="Tempel API Key dari aistudio.google.com/apikey"
+        style="flex:1;min-width:240px;padding:9px 12px;border-radius:8px;border:1px solid var(--bd2);background:var(--bg);color:var(--tx);font-family:var(--font);font-size:0.8846rem">
+      <button class="btn pri sm" onclick="saveGeminiKeyAI()">Simpan</button>
+      <button id="btn-clear-key" class="btn sm" onclick="clearGeminiKey()" style="display:none">Hapus</button>
+    </div>
+    <div id="api-key-status" style="display:none;margin-top:8px;font-size:0.8462rem"></div>
+    <div style="margin-top:8px;font-size:0.7692rem;color:var(--tx3)">Key disimpan ke server (Apps Script) agar berlaku untuk semua pengguna, dan juga disimpan lokal di browser ini sebagai cadangan.</div>
+  </div>
   <div id="analisis-content"></div>
-<input type="hidden" id="gemini-key-inp-ai"><div id="api-key-status" style="display:none"></div><div id="api-key-bar" style="display:none"></div><span id="api-key-btn-lbl"></span><button id="btn-clear-key" style="display:none"></button>
+<span id="api-key-btn-lbl"></span>
 </div>
 
 <!-- NOTES -->
@@ -3129,16 +3145,29 @@ async function updateAIHeroStatus(){
     return;
   }
 
-  // API Key Gemini sudah tertanam langsung di Apps Script (server proxy),
-  // jadi selama URL Sheet sudah dikonfigurasi, anggap AI selalu siap dipakai.
-  // Tidak perlu cek/poll ke server dan tidak perlu meminta API Key lagi.
   const url=(syncPrefs.url||'').trim();
-  if(url){
-    _serverHasKey=true;
-    _showKeyConnected(hero,null,null,'Gemini terhubung via Apps Script');
-  } else {
+  if(!url){
     hero.style.display='flex';hero.style.alignItems='center';hero.style.gap='6px';
     hero.innerHTML='<span style="width:7px;height:7px;border-radius:99px;background:#94a3b8;flex-shrink:0"></span><span style="color:var(--tx3);font-size:0.8846rem">Hubungkan Google Sheets di Pengaturan untuk mengaktifkan Analisis AI</span>';
+    return;
+  }
+
+  // Cek beneran ke server apakah key sudah dikonfigurasi (jangan asumsi)
+  hero.style.display='flex';hero.style.alignItems='center';hero.style.gap='6px';
+  hero.innerHTML='<span style="width:7px;height:7px;border-radius:99px;background:#94a3b8;flex-shrink:0"></span><span style="color:var(--tx3);font-size:0.8846rem">Memeriksa koneksi...</span>';
+  try{
+    const resp=await fetch(url+(url.includes('?')?'&':'?')+'action=get_config');
+    const j=await resp.json();
+    if(j.status==='ok' && j.has_gemini_key){
+      _serverHasKey=true;
+      _showKeyConnected(hero,null,null,'Gemini terhubung via Apps Script');
+    } else {
+      _serverHasKey=false;
+      _showKeyMissing(hero,null);
+    }
+  }catch(e){
+    _serverHasKey=false;
+    _showKeyMissing(hero,null);
   }
 }
 
