@@ -3459,7 +3459,7 @@ async function runAIAnalysis(silent){
 
   const ctx=buildGajiContextText(d,ap);
 
-  const prompt=`Kamu adalah analis keuangan senior yang menyusun laporan eksekutif untuk seorang Manager Keuangan di PT Jamkrindo Kanwil Surabaya.
+  const prompt=`Kamu adalah analis keuangan senior yang menyusun laporan eksekutif untuk seorang Manager Keuangan di perusahaan.
 Analisis data monitoring gaji berikut secara MENDALAM dan strategis — bukan sekadar melaporkan angka, tapi jelaskan MAKNA dan DAMPAKNYA terhadap pengambilan keputusan manajerial (cash flow, risiko operasional, prioritas approval, dsb). Rekomendasi yang kamu berikan HARUS mencerminkan kondisi data TERBARU saat ini (khususnya bagian "PERUBAHAN SEJAK DATA TERAKHIR DIUPDATE") — jangan mengulang rekomendasi generik yang sama setiap saat. Tulis dalam Bahasa Indonesia, gaya profesional-eksekutif, dan jangan terlalu singkat.
 
 ${ctx.text}
@@ -3544,7 +3544,7 @@ async function sendAIChatMessage(){
     return (m.role==='user'?'User: ':'Asisten: ')+t;
   }).join('\n');
 
-  const prompt=`Kamu adalah asisten analisis payroll untuk Manager Keuangan di PT Jamkrindo Kanwil Surabaya, sedang berdiskusi lewat chat.
+  const prompt=`Kamu adalah asisten analisis payroll untuk Manager Keuangan di perusahaan, sedang berdiskusi lewat chat.
 
 ATURAN WAJIB:
 1. Jawab HANYA berdasarkan angka yang benar-benar ada di "DATA TERKINI" di bawah — JANGAN pernah mengarang, menaksir, atau membulatkan angka yang tidak ada di data.
