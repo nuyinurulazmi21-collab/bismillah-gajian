@@ -3565,6 +3565,23 @@ async function sendAIChatMessage(){
       }).join('\n');
   }
 
+  // ── PERHITUNGAN OTOMATIS UNTUK PERTANYAAN BERBASIS TANGGAL ───────────
+  // LLM tidak andal menjumlahkan ratusan baris manual (rawan salah/copy-paste
+  // mentah). Kalau pertanyaan menyebut tanggal tertentu, hitung sendiri di JS
+  // dan sisipkan hasilnya sebagai fakta pasti.
+  var dateComputeText='';
+  var dateMatch=qLower.match(/tanggal\s*(\d{1,2})\b/) || qLower.match(/\btgl\s*(\d{1,2})\b/);
+  if(dateMatch){
+    var tglNum=parseInt(dateMatch[1]);
+    var onDate=d.filter(function(r){return r.tgl===tglNum;});
+    var onDateSudah=onDate.filter(isGajiReleased);
+    var onDateBelum=onDate.filter(function(r){return !isGajiReleased(r);});
+    dateComputeText='\n\nHASIL PERHITUNGAN OTOMATIS UNTUK TANGGAL '+tglNum+' (sudah dihitung pasti, JANGAN hitung ulang manual — pakai angka ini langsung):\n'
+      +'- Total site jadwal tanggal '+tglNum+': '+onDate.length+'\n'
+      +'- Sudah release: '+onDateSudah.length+' site, total Rp '+fmtF(onDateSudah.reduce(function(a,r){return a+(r.nominal||0);},0))+'\n'
+      +'- Belum release: '+onDateBelum.length+' site, total Rp '+fmtF(onDateBelum.reduce(function(a,r){return a+(r.nominal||0);},0));
+  }
+
   const history=(S.aiChat||[]).slice(-8).filter(function(m){return m.role==='user'||m.role==='assistant';}).map(function(m){
     var t=(m.text||'').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim().slice(0,400);
     return (m.role==='user'?'User: ':'Asisten: ')+t;
@@ -3573,16 +3590,17 @@ async function sendAIChatMessage(){
   const prompt=`Kamu adalah asisten analisis payroll untuk Manager Keuangan di perusahaan, sedang berdiskusi lewat chat.
 
 ATURAN WAJIB:
-1. Jawab HANYA berdasarkan angka yang benar-benar ada di "DATA TERKINI" (termasuk "DAFTAR LENGKAP SELURUH SITE" di dalamnya) atau "HASIL PENCARIAN SITE" di bawah — JANGAN pernah mengarang, menaksir, atau membulatkan angka yang tidak ada di data.
-2. Untuk pertanyaan ranking/urutan (site terbesar/terkecil, dst), HITUNG LANGSUNG dari "DAFTAR LENGKAP SELURUH SITE" — daftar itu berisi SEMUA site periode ini, bukan cuma sebagian. Jangan bilang data tidak tersedia untuk pertanyaan semacam itu.
-3. Jika ada bagian "HASIL PENCARIAN SITE", itu adalah data paling akurat untuk site yang ditanya — utamakan itu daripada ringkasan umum.
-4. Jika user menanyakan jumlah/angka spesifik (mis. "berapa site", "berapa total"), JAWAB LANGSUNG dengan angka pastinya di kalimat pertama, baru boleh ditambah penjelasan singkat setelahnya. Jangan malah membuka dengan daftar/list yang tidak menjawab pertanyaan.
-5. Jika data yang diminta benar-benar tidak ada di "DATA TERKINI" (sudah dicek termasuk daftar lengkapnya) maupun "HASIL PENCARIAN SITE", katakan terus terang datanya tidak tersedia — jangan menebak.
-6. Selalu jawab dalam Bahasa Indonesia, walau ada istilah asing dalam data.
-7. Ringkas dan to the point, hindari basa-basi panjang atau format laporan penuh kecuali diminta.
+1. Jawab HANYA berdasarkan angka yang benar-benar ada di "DATA TERKINI" (termasuk "DAFTAR LENGKAP SELURUH SITE" di dalamnya), "HASIL PENCARIAN SITE", atau "HASIL PERHITUNGAN OTOMATIS" di bawah — JANGAN pernah mengarang, menaksir, atau membulatkan angka yang tidak ada di data.
+2. DILARANG KERAS menyalin/menampilkan baris mentah dari "DAFTAR LENGKAP SELURUH SITE" sebagai jawaban. Itu data sumber untuk KAMU HITUNG SENDIRI, bukan untuk ditampilkan apa adanya. Jawaban harus berupa angka hasil hitungan dan penjelasan singkat — boleh sebutkan maksimal 5-10 nama site paling relevan, TIDAK BOLEH mendaftar puluhan/ratusan baris.
+3. Jika ada "HASIL PERHITUNGAN OTOMATIS", angka di situ sudah pasti benar — langsung pakai, jangan hitung ulang manual dari daftar mentah.
+4. Untuk pertanyaan ranking/urutan (site terbesar/terkecil, dst), HITUNG dari "DAFTAR LENGKAP SELURUH SITE" tapi jawab dengan RINGKASAN hasilnya saja (misal top 3-5), bukan seluruh daftarnya.
+5. Jika ada bagian "HASIL PENCARIAN SITE", itu adalah data paling akurat untuk site yang ditanya — utamakan itu daripada ringkasan umum.
+6. Jika user menanyakan jumlah/angka spesifik (mis. "berapa site", "berapa total"), JAWAB LANGSUNG dengan angka pastinya di kalimat pertama, baru boleh ditambah penjelasan singkat setelahnya.
+7. Jika data yang diminta benar-benar tidak ada di data manapun di bawah, katakan terus terang datanya tidak tersedia — jangan menebak.
+8. Selalu jawab dalam Bahasa Indonesia. Ringkas dan to the point, hindari basa-basi panjang.
 
 DATA TERKINI:
-${ctx.text}${siteLookupText}
+${ctx.text}${siteLookupText}${dateComputeText}
 
 RIWAYAT PERCAKAPAN SINGKAT:
 ${history||'(belum ada percakapan sebelumnya)'}
