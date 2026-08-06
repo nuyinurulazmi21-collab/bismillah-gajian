@@ -3544,6 +3544,35 @@ async function sendAIChatMessage(){
   showAITyping();
   const ctx=buildGajiContextText(d,ap);
 
+  // ── RINGKASAN SEMUA PERIODE (agar AI sadar konteks lintas waktu) ────
+  const allPids=[...new Set(S.allSites.map(r=>r.pid))];
+  const periodSummaryText='\n\nRINGKASAN SEMUA PERIODE YANG TERSEDIA DI SISTEM (untuk pertanyaan perbandingan/tren antar periode):\n'
+    +allPids.map(function(pid){
+      const b=BULAN_MAP.find(x=>x.pid===pid);
+      const ps=S.allSites.filter(r=>r.pid===pid);
+      if(!ps.length) return null;
+      const psTot=ps.reduce((a,r)=>a+(r.nominal||0),0);
+      const psSudah=ps.filter(isGajiReleased);
+      const psSudN=psSudah.reduce((a,r)=>a+(r.nominal||0),0);
+      const aktif=pid===S.activePid?' [PERIODE AKTIF SEKARANG]':'';
+      return '- '+(b?b.nama:pid)+aktif+': '+ps.length+' site, Total Rp '+fmtF(psTot)+', Sudah Release '+psSudah.length+' site (Rp '+fmtF(psSudN)+')';
+    }).filter(Boolean).join('\n');
+
+  // ── DETAIL LENGKAP UNTUK PERIODE LAIN YANG DISEBUT DI PERTANYAAN ────
+  // (default: hanya kirim daftar lengkap utk periode aktif, biar prompt tidak
+  // membengkak. Kalau user sebut nama bulan periode lain, kirim juga detailnya.)
+  var otherPeriodText='';
+  const qLowerPid=q.toLowerCase();
+  BULAN_MAP.forEach(function(b){
+    if(b.pid===S.activePid) return; // periode aktif sudah ada di ctx.text
+    const bulanKey=b.nama.split(' ')[0].toLowerCase(); // "juli", "agustus", dst
+    if(qLowerPid.indexOf(bulanKey)===-1) return;
+    const ps=S.allSites.filter(r=>r.pid===b.pid);
+    if(!ps.length) return;
+    otherPeriodText+='\n\nDAFTAR LENGKAP SITE UNTUK PERIODE '+b.nama.toUpperCase()+' — '+ps.length+' baris (format: Nama Site | BU | Area | Status | Nominal | Tgl Release | HC):\n'
+      +ps.slice().sort((a,c)=>(c.nominal||0)-(a.nominal||0)).map(r=>r.site+' | '+r.bu+' | '+r.area+' | '+(isGajiReleased(r)?'SUDAH':'BELUM')+' | '+fmtF(r.nominal)+' | '+(r.tgl_r||'-')+' | '+(r.hc||0)).join('\n');
+  });
+
   // ── PENCARIAN SITE SPESIFIK ──────────────────────────────────
   // buildGajiContextText hanya mengirim nama site yang BELUM release ke AI
   // (supaya prompt tidak membengkak untuk ratusan site). Kalau pertanyaan
@@ -3594,13 +3623,14 @@ ATURAN WAJIB:
 2. DILARANG KERAS menyalin/menampilkan baris mentah dari "DAFTAR LENGKAP SELURUH SITE" sebagai jawaban. Itu data sumber untuk KAMU HITUNG SENDIRI, bukan untuk ditampilkan apa adanya. Jawaban harus berupa angka hasil hitungan dan penjelasan singkat — boleh sebutkan maksimal 5-10 nama site paling relevan, TIDAK BOLEH mendaftar puluhan/ratusan baris.
 3. Jika ada "HASIL PERHITUNGAN OTOMATIS", angka di situ sudah pasti benar — langsung pakai, jangan hitung ulang manual dari daftar mentah.
 4. Untuk pertanyaan ranking/urutan (site terbesar/terkecil, dst), HITUNG dari "DAFTAR LENGKAP SELURUH SITE" tapi jawab dengan RINGKASAN hasilnya saja (misal top 3-5), bukan seluruh daftarnya.
-5. Jika ada bagian "HASIL PENCARIAN SITE", itu adalah data paling akurat untuk site yang ditanya — utamakan itu daripada ringkasan umum.
-6. Jika user menanyakan jumlah/angka spesifik (mis. "berapa site", "berapa total"), JAWAB LANGSUNG dengan angka pastinya di kalimat pertama, baru boleh ditambah penjelasan singkat setelahnya.
-7. Jika data yang diminta benar-benar tidak ada di data manapun di bawah, katakan terus terang datanya tidak tersedia — jangan menebak.
-8. Selalu jawab dalam Bahasa Indonesia. Ringkas dan to the point, hindari basa-basi panjang.
+5. Untuk pertanyaan perbandingan/tren ANTAR PERIODE (bulan lalu vs sekarang, dst), pakai "RINGKASAN SEMUA PERIODE". Kalau ada juga "DAFTAR LENGKAP SITE UNTUK PERIODE [nama]", itu berarti user menyebut periode itu spesifik — pakai untuk detail per-site di periode tersebut.
+6. Jika ada bagian "HASIL PENCARIAN SITE", itu adalah data paling akurat untuk site yang ditanya — utamakan itu daripada ringkasan umum.
+7. Jika user menanyakan jumlah/angka spesifik (mis. "berapa site", "berapa total"), JAWAB LANGSUNG dengan angka pastinya di kalimat pertama, baru boleh ditambah penjelasan singkat setelahnya.
+8. Jika data yang diminta benar-benar tidak ada di data manapun di bawah, katakan terus terang datanya tidak tersedia — jangan menebak.
+9. Selalu jawab dalam Bahasa Indonesia. Ringkas dan to the point, hindari basa-basi panjang.
 
 DATA TERKINI:
-${ctx.text}${siteLookupText}${dateComputeText}
+${ctx.text}${siteLookupText}${dateComputeText}${periodSummaryText}${otherPeriodText}
 
 RIWAYAT PERCAKAPAN SINGKAT:
 ${history||'(belum ada percakapan sebelumnya)'}
