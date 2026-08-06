@@ -3461,9 +3461,13 @@ JADWAL BELUM RELEASE: ${jadwalBelum.join(', ')||'Semua sudah release'}
 
 PERUBAHAN SEJAK DATA TERAKHIR DIUPDATE: ${changesTxt}
 
-DAFTAR LENGKAP SELURUH SITE PERIODE INI — ${d.length} baris (format: Nama Site | BU | Area | Status | Nominal | Tgl Release | HC).
-Gunakan daftar ini untuk pertanyaan ranking/urutan/pencarian apapun (site terbesar, terkecil, per BU, per area, dst) — jangan pernah bilang data tidak tersedia kalau jawabannya bisa dihitung dari daftar ini:
-${d.slice().sort((a,b)=>(b.nominal||0)-(a.nominal||0)).map(r=>r.site+' | '+r.bu+' | '+r.area+' | '+(isGajiReleased(r)?'SUDAH':'BELUM')+' | '+fmtF(r.nominal)+' | '+(r.tgl_r||'-')+' | '+(r.hc||0)).join('\n')}`
+TOP 10 SITE NOMINAL TERBESAR (SELURUH STATUS):
+${d.slice().sort((a,b)=>(b.nominal||0)-(a.nominal||0)).slice(0,10).map((r,i)=>(i+1)+'. '+r.site+' ('+r.bu+', '+(isGajiReleased(r)?'SUDAH':'BELUM')+'): '+fmtF(r.nominal)).join('\n')}
+
+TOP 10 SITE NOMINAL TERKECIL (SELURUH STATUS, nominal > 0):
+${d.filter(r=>r.nominal>0).slice().sort((a,b)=>(a.nominal||0)-(b.nominal||0)).slice(0,10).map((r,i)=>(i+1)+'. '+r.site+' ('+r.bu+', '+(isGajiReleased(r)?'SUDAH':'BELUM')+'): '+fmtF(r.nominal)).join('\n')}
+
+Catatan: di atas hanya Top 10 (bukan seluruh ${d.length} site) supaya ringkas. Untuk site spesifik yang disebut namanya di pertanyaan, lihat bagian "HASIL PENCARIAN SITE" di bawah (kalau ada).`
   };
 }
 
@@ -3628,8 +3632,10 @@ async function sendAIChatMessage(){
     if(qLowerPid.indexOf(bulanKey)===-1) return;
     const ps=S.allSites.filter(r=>r.pid===b.pid);
     if(!ps.length) return;
-    otherPeriodText+='\n\nDAFTAR LENGKAP SITE UNTUK PERIODE '+b.nama.toUpperCase()+' — '+ps.length+' baris (format: Nama Site | BU | Area | Status | Nominal | Tgl Release | HC):\n'
-      +ps.slice().sort((a,c)=>(c.nominal||0)-(a.nominal||0)).map(r=>r.site+' | '+r.bu+' | '+r.area+' | '+(isGajiReleased(r)?'SUDAH':'BELUM')+' | '+fmtF(r.nominal)+' | '+(r.tgl_r||'-')+' | '+(r.hc||0)).join('\n');
+    const psSudah=ps.filter(isGajiReleased), psBelum=ps.filter(r=>!isGajiReleased(r));
+    otherPeriodText+='\n\nDETAIL PERIODE '+b.nama.toUpperCase()+' ('+ps.length+' site total, '+psSudah.length+' sudah release, '+psBelum.length+' belum release):\n'
+      +'Top 10 nominal terbesar:\n'
+      +ps.slice().sort((a,c)=>(c.nominal||0)-(a.nominal||0)).slice(0,10).map((r,i)=>(i+1)+'. '+r.site+' ('+r.bu+', '+(isGajiReleased(r)?'SUDAH':'BELUM')+'): '+fmtF(r.nominal)).join('\n');
   });
 
   // ── PENCARIAN SITE SPESIFIK ──────────────────────────────────
@@ -3678,11 +3684,11 @@ async function sendAIChatMessage(){
   const prompt=`Kamu adalah asisten analisis payroll untuk Manager Keuangan di perusahaan, sedang berdiskusi lewat chat.
 
 ATURAN WAJIB:
-1. Jawab HANYA berdasarkan angka yang benar-benar ada di "DATA TERKINI" (termasuk "DAFTAR LENGKAP SELURUH SITE" di dalamnya), "HASIL PENCARIAN SITE", atau "HASIL PERHITUNGAN OTOMATIS" di bawah — JANGAN pernah mengarang, menaksir, atau membulatkan angka yang tidak ada di data.
-2. DILARANG KERAS menyalin/menampilkan baris mentah dari "DAFTAR LENGKAP SELURUH SITE" sebagai jawaban. Itu data sumber untuk KAMU HITUNG SENDIRI, bukan untuk ditampilkan apa adanya. Jawaban harus berupa angka hasil hitungan dan penjelasan singkat — boleh sebutkan maksimal 5-10 nama site paling relevan, TIDAK BOLEH mendaftar puluhan/ratusan baris.
-3. Jika ada "HASIL PERHITUNGAN OTOMATIS", angka di situ sudah pasti benar — langsung pakai, jangan hitung ulang manual dari daftar mentah.
-4. Untuk pertanyaan ranking/urutan (site terbesar/terkecil, dst), HITUNG dari "DAFTAR LENGKAP SELURUH SITE" tapi jawab dengan RINGKASAN hasilnya saja (misal top 3-5), bukan seluruh daftarnya.
-5. Untuk pertanyaan perbandingan/tren ANTAR PERIODE (bulan lalu vs sekarang, dst), pakai "RINGKASAN SEMUA PERIODE". Kalau ada juga "DAFTAR LENGKAP SITE UNTUK PERIODE [nama]", itu berarti user menyebut periode itu spesifik — pakai untuk detail per-site di periode tersebut.
+1. Jawab HANYA berdasarkan angka yang benar-benar ada di "DATA TERKINI" (termasuk "TOP 10 SITE" di dalamnya), "HASIL PENCARIAN SITE", atau "HASIL PERHITUNGAN OTOMATIS" di bawah — JANGAN pernah mengarang, menaksir, atau membulatkan angka yang tidak ada di data.
+2. DILARANG KERAS menyalin/menampilkan seluruh baris data mentah sebagai jawaban. Jawaban harus berupa angka hasil hitungan dan penjelasan singkat — boleh sebutkan maksimal 5-10 nama site paling relevan, TIDAK BOLEH mendaftar puluhan/ratusan baris.
+3. Jika ada "HASIL PERHITUNGAN OTOMATIS", angka di situ sudah pasti benar — langsung pakai, jangan hitung ulang manual.
+4. Untuk pertanyaan ranking/urutan (site terbesar/terkecil), pakai "TOP 10 SITE NOMINAL TERBESAR"/"TERKECIL" yang sudah tersedia — itu sudah diurutkan, tinggal ambil beberapa teratas sesuai kebutuhan pertanyaan. Kalau yang ditanya di luar Top 10 itu, katakan datanya di luar cakupan Top 10 yang tersedia.
+5. Untuk pertanyaan perbandingan/tren ANTAR PERIODE (bulan lalu vs sekarang, dst), pakai "RINGKASAN SEMUA PERIODE". Kalau ada juga "DETAIL PERIODE [nama]", itu berarti user menyebut periode itu spesifik — pakai untuk detail site di periode tersebut.
 6. Jika ada bagian "HASIL PENCARIAN SITE", itu adalah data paling akurat untuk site yang ditanya — utamakan itu daripada ringkasan umum.
 7. Jika user menanyakan jumlah/angka spesifik (mis. "berapa site", "berapa total"), JAWAB LANGSUNG dengan angka pastinya di kalimat pertama, baru boleh ditambah penjelasan singkat setelahnya.
 8. Jika data yang diminta benar-benar tidak ada di data manapun di bawah, katakan terus terang datanya tidak tersedia — jangan menebak.
