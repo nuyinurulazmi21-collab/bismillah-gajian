@@ -3539,6 +3539,28 @@ async function sendAIChatMessage(){
 
   showAITyping();
   const ctx=buildGajiContextText(d,ap);
+
+  // ── PENCARIAN SITE SPESIFIK ──────────────────────────────────
+  // buildGajiContextText hanya mengirim nama site yang BELUM release ke AI
+  // (supaya prompt tidak membengkak untuk ratusan site). Kalau pertanyaan
+  // menyebut nama site tertentu (baik sudah maupun belum release), cari
+  // langsung di data lokal dan sisipkan hasilnya secara eksplisit —
+  // supaya AI tidak pernah salah bilang "tidak tersedia" padahal ada.
+  const qLower=q.toLowerCase();
+  const qWords=qLower.split(/[^a-z0-9]+/).filter(function(w){return w.length>=3;});
+  const siteMatches=d.filter(function(r){
+    var siteLower=(r.site||'').toLowerCase();
+    if(qLower.indexOf(siteLower)>-1 && siteLower.length>=3) return true;
+    return qWords.some(function(w){return siteLower.indexOf(w)>-1;});
+  }).slice(0,10);
+  var siteLookupText='';
+  if(siteMatches.length){
+    siteLookupText='\n\nHASIL PENCARIAN SITE YANG DISEBUT DI PERTANYAAN (data pasti, gunakan ini sebagai sumber utama untuk menjawab):\n'
+      +siteMatches.map(function(r){
+        return '- '+r.site+' ('+r.bu+', '+r.area+'): '+(isGajiReleased(r)?'SUDAH DIRELEASE pada '+r.tgl_r:'BELUM DIRELEASE')+', nominal '+fmtF(r.nominal)+', HC '+(r.hc||0);
+      }).join('\n');
+  }
+
   const history=(S.aiChat||[]).slice(-8).filter(function(m){return m.role==='user'||m.role==='assistant';}).map(function(m){
     var t=(m.text||'').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim().slice(0,400);
     return (m.role==='user'?'User: ':'Asisten: ')+t;
@@ -3547,14 +3569,15 @@ async function sendAIChatMessage(){
   const prompt=`Kamu adalah asisten analisis payroll untuk Manager Keuangan di perusahaan, sedang berdiskusi lewat chat.
 
 ATURAN WAJIB:
-1. Jawab HANYA berdasarkan angka yang benar-benar ada di "DATA TERKINI" di bawah — JANGAN pernah mengarang, menaksir, atau membulatkan angka yang tidak ada di data.
-2. Jika user menanyakan jumlah/angka spesifik (mis. "berapa site", "berapa total"), JAWAB LANGSUNG dengan angka pastinya di kalimat pertama, baru boleh ditambah penjelasan singkat setelahnya. Jangan malah membuka dengan daftar/list yang tidak menjawab pertanyaan.
-3. Jika data yang diminta tidak tersedia di "DATA TERKINI", katakan terus terang datanya tidak tersedia — jangan menebak.
-4. Selalu jawab dalam Bahasa Indonesia, walau ada istilah asing dalam data.
-5. Ringkas dan to the point, hindari basa-basi panjang atau format laporan penuh kecuali diminta.
+1. Jawab HANYA berdasarkan angka yang benar-benar ada di "DATA TERKINI" atau "HASIL PENCARIAN SITE" di bawah — JANGAN pernah mengarang, menaksir, atau membulatkan angka yang tidak ada di data.
+2. Jika ada bagian "HASIL PENCARIAN SITE", itu adalah data paling akurat untuk site yang ditanya — utamakan itu daripada ringkasan umum.
+3. Jika user menanyakan jumlah/angka spesifik (mis. "berapa site", "berapa total"), JAWAB LANGSUNG dengan angka pastinya di kalimat pertama, baru boleh ditambah penjelasan singkat setelahnya. Jangan malah membuka dengan daftar/list yang tidak menjawab pertanyaan.
+4. Jika data yang diminta benar-benar tidak ada di "DATA TERKINI" maupun "HASIL PENCARIAN SITE", katakan terus terang datanya tidak tersedia — jangan menebak.
+5. Selalu jawab dalam Bahasa Indonesia, walau ada istilah asing dalam data.
+6. Ringkas dan to the point, hindari basa-basi panjang atau format laporan penuh kecuali diminta.
 
 DATA TERKINI:
-${ctx.text}
+${ctx.text}${siteLookupText}
 
 RIWAYAT PERCAKAPAN SINGKAT:
 ${history||'(belum ada percakapan sebelumnya)'}
