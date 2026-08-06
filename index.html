@@ -3400,7 +3400,11 @@ ${top5Belum.map(r=>'- '+r.site+' ('+r.bu+'): '+fmtF(r.nominal)).join(', ')||'Tid
 
 JADWAL BELUM RELEASE: ${jadwalBelum.join(', ')||'Semua sudah release'}
 
-PERUBAHAN SEJAK DATA TERAKHIR DIUPDATE: ${changesTxt}`
+PERUBAHAN SEJAK DATA TERAKHIR DIUPDATE: ${changesTxt}
+
+DAFTAR LENGKAP SELURUH SITE PERIODE INI — ${d.length} baris (format: Nama Site | BU | Area | Status | Nominal | Tgl Release | HC).
+Gunakan daftar ini untuk pertanyaan ranking/urutan/pencarian apapun (site terbesar, terkecil, per BU, per area, dst) — jangan pernah bilang data tidak tersedia kalau jawabannya bisa dihitung dari daftar ini:
+${d.slice().sort((a,b)=>(b.nominal||0)-(a.nominal||0)).map(r=>r.site+' | '+r.bu+' | '+r.area+' | '+(isGajiReleased(r)?'SUDAH':'BELUM')+' | '+fmtF(r.nominal)+' | '+(r.tgl_r||'-')+' | '+(r.hc||0)).join('\n')}`
   };
 }
 
@@ -3569,12 +3573,13 @@ async function sendAIChatMessage(){
   const prompt=`Kamu adalah asisten analisis payroll untuk Manager Keuangan di perusahaan, sedang berdiskusi lewat chat.
 
 ATURAN WAJIB:
-1. Jawab HANYA berdasarkan angka yang benar-benar ada di "DATA TERKINI" atau "HASIL PENCARIAN SITE" di bawah — JANGAN pernah mengarang, menaksir, atau membulatkan angka yang tidak ada di data.
-2. Jika ada bagian "HASIL PENCARIAN SITE", itu adalah data paling akurat untuk site yang ditanya — utamakan itu daripada ringkasan umum.
-3. Jika user menanyakan jumlah/angka spesifik (mis. "berapa site", "berapa total"), JAWAB LANGSUNG dengan angka pastinya di kalimat pertama, baru boleh ditambah penjelasan singkat setelahnya. Jangan malah membuka dengan daftar/list yang tidak menjawab pertanyaan.
-4. Jika data yang diminta benar-benar tidak ada di "DATA TERKINI" maupun "HASIL PENCARIAN SITE", katakan terus terang datanya tidak tersedia — jangan menebak.
-5. Selalu jawab dalam Bahasa Indonesia, walau ada istilah asing dalam data.
-6. Ringkas dan to the point, hindari basa-basi panjang atau format laporan penuh kecuali diminta.
+1. Jawab HANYA berdasarkan angka yang benar-benar ada di "DATA TERKINI" (termasuk "DAFTAR LENGKAP SELURUH SITE" di dalamnya) atau "HASIL PENCARIAN SITE" di bawah — JANGAN pernah mengarang, menaksir, atau membulatkan angka yang tidak ada di data.
+2. Untuk pertanyaan ranking/urutan (site terbesar/terkecil, dst), HITUNG LANGSUNG dari "DAFTAR LENGKAP SELURUH SITE" — daftar itu berisi SEMUA site periode ini, bukan cuma sebagian. Jangan bilang data tidak tersedia untuk pertanyaan semacam itu.
+3. Jika ada bagian "HASIL PENCARIAN SITE", itu adalah data paling akurat untuk site yang ditanya — utamakan itu daripada ringkasan umum.
+4. Jika user menanyakan jumlah/angka spesifik (mis. "berapa site", "berapa total"), JAWAB LANGSUNG dengan angka pastinya di kalimat pertama, baru boleh ditambah penjelasan singkat setelahnya. Jangan malah membuka dengan daftar/list yang tidak menjawab pertanyaan.
+5. Jika data yang diminta benar-benar tidak ada di "DATA TERKINI" (sudah dicek termasuk daftar lengkapnya) maupun "HASIL PENCARIAN SITE", katakan terus terang datanya tidak tersedia — jangan menebak.
+6. Selalu jawab dalam Bahasa Indonesia, walau ada istilah asing dalam data.
+7. Ringkas dan to the point, hindari basa-basi panjang atau format laporan penuh kecuali diminta.
 
 DATA TERKINI:
 ${ctx.text}${siteLookupText}
