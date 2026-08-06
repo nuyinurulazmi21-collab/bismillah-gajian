@@ -3475,6 +3475,7 @@ Catatan: di atas hanya Top 10 (bukan seluruh ${d.length} site) supaya ringkas. U
 async function callGeminiAPI(prompt){
   const url=(syncPrefs.url||'').trim();
   var result=null;
+  var lastErr='';
   if(url){
     try{
       const resp = await fetch(url, {
@@ -3489,13 +3490,17 @@ async function callGeminiAPI(prompt){
         } else if(j.status==='error'){
           if(j.message && j.message.includes('belum dikonfigurasi')){
             addNotif('⚠ API Key belum diset di server — coba key lokal','warn');
+            lastErr='Server: API Key belum dikonfigurasi';
           } else {
-            throw new Error(j.message||'Gemini proxy error');
+            lastErr='Server: '+(j.message||'Gemini proxy error');
           }
         }
+      } else {
+        lastErr='Server HTTP '+resp.status;
       }
     } catch(proxyErr){
       console.warn('Proxy error:', proxyErr.message);
+      lastErr='Server: '+proxyErr.message;
     }
   }
   if(!result && S.geminiKey){
@@ -3508,9 +3513,16 @@ async function callGeminiAPI(prompt){
       if(resp2.ok){
         const j2=await resp2.json();
         result=j2.candidates?.[0]?.content?.parts?.[0]?.text||'';
+        if(!result) lastErr='Key lokal: respons kosong ('+(j2.promptFeedback?.blockReason||'tidak diketahui')+')';
+      } else {
+        const errBody=await resp2.json().catch(()=>({}));
+        const errMsg=errBody?.error?.message||('HTTP '+resp2.status);
+        lastErr='Key lokal: '+errMsg+(resp2.status===429?' (kemungkinan kuota API habis)':'');
+        console.warn('Local key error:', resp2.status, errMsg);
       }
-    } catch(e2){ console.warn('Local key error:', e2.message); }
+    } catch(e2){ console.warn('Local key error:', e2.message); lastErr='Key lokal: '+e2.message; }
   }
+  callGeminiAPI.lastError=lastErr;
   return result;
 }
 
@@ -3708,7 +3720,8 @@ PERTANYAAN BARU DARI USER: ${q}`;
     if(result){
       pushAIChatMessage('assistant', formatAIResponse(result), '');
     } else {
-      pushAIChatMessage('assistant', 'Maaf, saat ini saya tidak bisa terhubung ke layanan Gemini. Pastikan Google Sheets/Apps Script sudah terhubung di Pengaturan, atau coba lagi sebentar lagi.', '');
+      var detail=callGeminiAPI.lastError?(' Detail: '+callGeminiAPI.lastError):'';
+      pushAIChatMessage('assistant', 'Maaf, saat ini saya tidak bisa terhubung ke layanan Gemini.'+detail, '');
     }
   } catch(e){
     hideAITyping();
