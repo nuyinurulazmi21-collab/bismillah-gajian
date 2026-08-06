@@ -359,6 +359,17 @@ body.dark .sb-v{color:var(--tx)}
 .g32{display:grid;grid-template-columns:3fr 2fr;gap:16px;margin-bottom:16px}
 @media(max-width:900px){.g2,.g3,.g23,.g32{grid-template-columns:1fr}}
 .cw{position:relative}.h160{height:160px}.h200{height:200px}.h240{height:240px}.h280{height:280px}.h320{height:320px}
+.donut-wrap{display:flex;align-items:center;gap:24px;padding:20px;flex-wrap:wrap}
+.donut-canvas-box{position:relative;width:180px;height:180px;flex-shrink:0}
+.donut-legend{flex:1;min-width:220px;display:flex;flex-direction:column;gap:14px}
+.donut-legend-row{display:flex;flex-direction:column;gap:5px}
+.donut-legend-top{display:flex;align-items:center;justify-content:space-between;font-size:0.8462rem}
+.donut-legend-label{display:flex;align-items:center;gap:8px;font-weight:600;color:var(--tx)}
+.donut-legend-dot{width:9px;height:9px;border-radius:99px;flex-shrink:0}
+.donut-legend-pct{color:var(--tx3);font-size:0.7692rem;font-weight:700}
+.donut-legend-val{font-weight:700;color:var(--tx)}
+.donut-legend-bar{height:4px;border-radius:99px;background:var(--bg3);overflow:hidden}
+.donut-legend-bar-fill{height:100%;border-radius:99px}
 
 /* ══ PROGRESS RING ══ */
 .ring-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px 0}
@@ -982,7 +993,14 @@ body.dark .saldo-tbl tfoot td{background:var(--bg3);color:var(--tx2)}
     <button class="tab-btn" onclick="switchGTab(4,this)">Tren</button>
   </div>
   <div class="tab-pane on" id="gtc0"><div class="g23"><div class="card nb"><div class="ch"><div class="ct">Gaji per Rekap Jadwal (Stacked)</div></div><div class="cw h300"><canvas id="cg-jdw-stk"></canvas></div></div><div class="card nb"><div class="ch"><div class="ct">Ringkasan Strip</div></div><div id="g-jdw-strip" style="max-height:280px;overflow-y:auto"></div></div></div></div>
-  <div class="tab-pane" id="gtc1"><div class="g2"><div class="card nb"><div class="ch"><div class="ct">Nominal per BU</div></div><div class="cw h280"><canvas id="cg-bu-bar"></canvas></div></div><div class="card nb"><div class="ch"><div class="ct">HC per BU</div></div><div class="cw h280"><canvas id="cg-bu-hc"></canvas></div></div></div></div>
+  <div class="tab-pane" id="gtc1"><div class="g2">
+    <div class="card nb"><div class="ch"><div class="ct">Distribusi Nominal per BU</div></div>
+      <div class="donut-wrap"><div class="donut-canvas-box"><canvas id="cg-bu-bar"></canvas></div><div class="donut-legend" id="cg-bu-bar-legend"></div></div>
+    </div>
+    <div class="card nb"><div class="ch"><div class="ct">Distribusi HC per BU</div></div>
+      <div class="donut-wrap"><div class="donut-canvas-box"><canvas id="cg-bu-hc"></canvas></div><div class="donut-legend" id="cg-bu-hc-legend"></div></div>
+    </div>
+  </div></div>
   <div class="tab-pane" id="gtc2"><div class="g2"><div class="card nb"><div class="ch"><div class="ct">Gaji per Area</div></div><div class="cw h280"><canvas id="cg-area-bar"></canvas></div></div><div class="card nb"><div class="ch"><div class="ct">Sebaran Area (Polar)</div></div><div class="cw h280"><canvas id="cg-area-pol"></canvas></div></div></div></div>
   <div class="tab-pane" id="gtc3"><div class="g2"><div class="card nb"><div class="ch"><div class="ct">Nalangi vs Tidak per BU</div></div><div class="cw h280"><canvas id="cg-nl-bu"></canvas></div></div><div class="card nb"><div class="ch"><div class="ct">Status Release per BU</div></div><div class="cw h280"><canvas id="cg-sts-bu"></canvas></div></div></div></div>
   <div class="tab-pane" id="gtc4"><div class="g2"><div class="card nb"><div class="ch"><div class="ct">Progres Release per Jadwal</div></div><div class="cw h280"><canvas id="cg-line-rel"></canvas></div></div><div class="card nb"><div class="ch"><div class="ct">Nominal Nalangi per Jadwal (Area)</div></div><div class="cw h280"><canvas id="cg-area-nal"></canvas></div></div></div></div>
@@ -1464,6 +1482,49 @@ function mkC(id,type,labels,datasets,opts={}){
   }});
 }
 function destroyAllCharts(){Object.values(CHS).forEach(c=>{try{c.destroy()}catch(e){}});CHS={};}
+
+// ── DONUT CARD EYE-CATCHING (ring + total di tengah + legend custom) ──
+function mkDonutCard(canvasId,legendId,labels,values,colors,totalLabel,fmt){
+  fmt=fmt||fmtRp;
+  if(CHS[canvasId]){CHS[canvasId].destroy();delete CHS[canvasId];}
+  const el=g(canvasId);if(!el)return;
+  const tot=values.reduce((a,v)=>a+v,0);
+  const tc=S.isDark?'#8896a8':'#4a5568';
+  const centerTextPlugin={
+    id:'centerText_'+canvasId,
+    afterDraw(chart){
+      const {ctx,chartArea}=chart;if(!chartArea)return;
+      const cx=(chartArea.left+chartArea.right)/2, cy=(chartArea.top+chartArea.bottom)/2;
+      ctx.save();
+      ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.font='700 11px Inter, Arial';ctx.fillStyle=tc;
+      ctx.fillText('TOTAL',cx,cy-14);
+      ctx.font='800 17px Inter, Arial';ctx.fillStyle=S.isDark?'#e8eef5':'#0a1628';
+      ctx.fillText(fmt(tot),cx,cy+6);
+      if(totalLabel){ctx.font='600 9.5px Inter, Arial';ctx.fillStyle=tc;ctx.fillText(totalLabel,cx,cy+24);}
+      ctx.restore();
+    }
+  };
+  CHS[canvasId]=new Chart(el,{type:'doughnut',data:{labels,datasets:[{data:values,backgroundColor:colors,borderWidth:3,borderColor:S.isDark?'#0d1f3c':'#fff',hoverOffset:6}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'74%',
+      plugins:{legend:{display:false},
+        tooltip:{backgroundColor:S.isDark?'#0d1f3c':'rgba(10,22,40,.95)',titleColor:'#fff',bodyColor:'rgba(255,255,255,.75)',cornerRadius:10,padding:11,
+          callbacks:{label:ctx=>' '+fmt(ctx.parsed)+' ('+pct(ctx.parsed,tot)+'%)'}}},
+      animation:{duration:700,easing:'easeOutCubic'}},
+    plugins:[centerTextPlugin]});
+
+  const lg=g(legendId);if(!lg)return;
+  lg.innerHTML=labels.map((l,i)=>{
+    const v=values[i],p=pct(v,tot),c=colors[i];
+    return `<div class="donut-legend-row">
+      <div class="donut-legend-top">
+        <div class="donut-legend-label"><span class="donut-legend-dot" style="background:${c}"></span>${l}</div>
+        <div><span class="donut-legend-pct">(${p}%)</span> <span class="donut-legend-val">${fmt(v)}</span></div>
+      </div>
+      <div class="donut-legend-bar"><div class="donut-legend-bar-fill" style="width:${p}%;background:${c}"></div></div>
+    </div>`;
+  }).join('');
+}
 
 // ── AUTH ───────────────────────────────────────────────
 function togglePw(id,btn){const el=g(id);if(!el)return;const show=el.type==='password';el.type=show?'text':'password';btn.innerHTML=show?`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`:`<svg id="eye-sh" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;}
@@ -2966,9 +3027,9 @@ function renderGrafik(){
   }
   if(gTabIdx===1){
     const bm={};d.forEach(r=>{if(!bm[r.bu])bm[r.bu]=0;bm[r.bu]+=(r.nominal||0);});const bks=Object.keys(bm).sort((a,b)=>bm[b]-bm[a]);
-    mkC('cg-bu-bar','bar',bks,[{data:bks.map(b=>bm[b]),backgroundColor:bks.map(b=>BU_CLR[b]||'#1e6bba'),borderRadius:8,borderSkipped:false}]);
+    mkDonutCard('cg-bu-bar','cg-bu-bar-legend',bks,bks.map(b=>bm[b]),bks.map(b=>BU_CLR[b]||'#1e6bba'),'NOMINAL');
     const hm={};d.forEach(r=>{if(!hm[r.bu])hm[r.bu]=0;hm[r.bu]+=(r.hc||0);});const hks=Object.keys(hm).sort((a,b)=>hm[b]-hm[a]);
-    mkC('cg-bu-hc','bar',hks,[{data:hks.map(b=>hm[b]),backgroundColor:hks.map(b=>BU_CLR[b]+'aa'),borderRadius:8,borderSkipped:false}],{scales:{x:{ticks:{color:tc,font:{size:10}},grid:{color:'transparent'},border:{display:false}},y:{ticks:{color:tc,font:{size:10},callback:v=>v.toLocaleString()},grid:{color:S.isDark?'rgba(255,255,255,.04)':'rgba(10,22,40,.04)'},border:{display:false}}}});
+    mkDonutCard('cg-bu-hc','cg-bu-hc-legend',hks,hks.map(b=>hm[b]),hks.map(b=>BU_CLR[b]||'#1e6bba'),'HEAD COUNT',fmtNum);
   }
   if(gTabIdx===2){
     const am={};d.forEach(r=>{if(!am[r.area])am[r.area]=0;am[r.area]+=(r.nominal||0);});const ak=Object.keys(am).sort((a,b)=>am[b]-am[a]);const ac=['rgba(30,107,186,.75)','rgba(13,159,110,.75)','rgba(217,119,6,.75)','rgba(124,58,237,.75)'];
